@@ -6,6 +6,11 @@ Rectangle {
     property bool expanded: false
     property int view: 0
     property bool animateSelf: true
+    property bool showFocusProbe: true
+    property bool showStatus: false
+
+    readonly property bool probeHasFocus: probe.hasFocus
+    property string status: ""
 
     readonly property int targetWidth: expanded ? Theme.panelWidth : Theme.compactWidth
     readonly property int targetHeight: expanded ? Theme.panelHeight : Theme.compactHeight
@@ -39,46 +44,92 @@ Rectangle {
         }
     }
 
-    Keys.onEscapePressed: expanded = false
+    MouseArea {
+        anchors.fill: parent
+        z: -1
+        onClicked: island.expanded = !island.expanded
+    }
 
-    Column {
+    Text {
+        id: label
+
         anchors.centerIn: parent
-        spacing: Theme.spacingTight
+        visible: !island.expanded
+        color: Theme.text
+        font.family: "Inter"
+        font.pixelSize: 14
+        font.weight: Font.DemiBold
+        text: island.status.length > 0 ? island.status : "compact pill"
+    }
 
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            color: Theme.text
-            font.family: "Inter"
-            font.pixelSize: island.expanded ? 0 : 14
-            font.weight: Font.DemiBold
-            opacity: island.expanded ? 0 : 1
-            text: "compact pill"
+    PanelHost {
+        id: panel
 
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Theme.crossfadeDuration
-                    easing.type: Easing.OutCubic
-                }
-            }
-        }
+        anchors.fill: parent
+        view: island.view
+        opacity: island.expanded ? 1 : 0
+        visible: opacity > 0
+        enabled: opacity > 0
 
-        PanelHost {
-            anchors.fill: parent
-            view: island.view
-            opacity: island.expanded ? 1 : 0
-            visible: opacity > 0
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Theme.crossfadeDuration
-                    easing.type: Easing.OutCubic
-                }
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Theme.crossfadeDuration
+                easing.type: Easing.OutCubic
             }
         }
     }
 
-    MouseArea {
-        anchors.fill: parent
-        onClicked: island.expanded = !island.expanded
+    FocusProbeItem {
+        id: probe
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Theme.spacingLoose
+        width: Math.min(440, parent.width - Theme.spacingLoose * 2)
+        height: 44
+        opacity: island.expanded ? 1 : 0
+        visible: opacity > 0
+        enabled: opacity > 0
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Theme.crossfadeDuration
+                easing.type: Easing.OutCubic
+            }
+        }
+    }
+
+    function collapse() {
+        expanded = false;
+        probe.releaseFocus();
+    }
+
+    function grabFocus() {
+        setExpanded(true);
+        probe.grabFocus();
+    }
+
+    function setExpanded(value) {
+        expanded = value;
+        if (!value)
+            probe.releaseFocus();
+    }
+
+    Keys.onEscapePressed: {
+        island.collapse();
+        event.accepted = true;
+    }
+    Keys.onLeftPressed: {
+        island.cycleView(-1);
+        event.accepted = true;
+    }
+    Keys.onRightPressed: {
+        island.cycleView(1);
+        event.accepted = true;
+    }
+
+    function cycleView(delta) {
+        var count = PanelCatalog.names.length;
+        view = (view + delta + count) % count;
     }
 }

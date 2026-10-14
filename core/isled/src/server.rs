@@ -166,6 +166,12 @@ impl Server {
                     .send(ServerMessage::event("island.toggle", serde_json::json!({})));
                 ServerMessage::reply_ok(id)
             }
+            "island.focus" => {
+                let _ = self
+                    .events
+                    .send(ServerMessage::event("island.focus", serde_json::json!({})));
+                ServerMessage::reply_ok(id)
+            }
             other => ServerMessage::reply_err(id, format!("unknown command: {other}")),
         }
     }

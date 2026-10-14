@@ -5,17 +5,8 @@ Item {
 
     property int view: 0
 
-    readonly property var names: [
-        "context",
-        "media",
-        "notifications",
-        "clipboard",
-        "calendar",
-        "todos",
-        "notes",
-        "network",
-        "theme"
-    ]
+    readonly property string title: PanelCatalog.names[view] ?? "?"
+    readonly property string subtitle: PanelCatalog.subtitles[view] ?? ""
 
     Column {
         anchors.fill: parent
@@ -23,18 +14,31 @@ Item {
         spacing: Theme.spacing
 
         Text {
-            text: host.names[host.view] ?? "?"
+            text: host.title
             color: Theme.text
             font.family: "Inter"
-            font.pixelSize: 22
+            font.pixelSize: 24
             font.weight: Font.Bold
         }
 
         Text {
-            text: "phase 0 placeholder"
+            text: host.subtitle
             color: Theme.textDim
             font.family: "Inter"
             font.pixelSize: 13
+        }
+
+        Rectangle {
+            width: parent.width
+            height: 1
+            color: Theme.border
+        }
+
+        Text {
+            text: "Mod+Alt+" + (host.view + 1) + " · placeholder — phase 1"
+            color: Theme.textDim
+            font.family: "Inter"
+            font.pixelSize: 12
         }
 
         Item {

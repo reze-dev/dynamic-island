@@ -22,6 +22,7 @@ QtObject {
 
     signal viewRequested(int index)
     signal toggleRequested()
+    signal focusRequested()
 
     function call(name, args) {
         var message = {
@@ -75,6 +76,8 @@ QtObject {
                 viewRequested(message.data.index | 0);
             else if (message.topic === "island.toggle")
                 toggleRequested();
+            else if (message.topic === "island.focus")
+                focusRequested();
         }
     }
 

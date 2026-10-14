@@ -9,8 +9,8 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     focusable: IslandSettings.keyboardFocus
 
-    property bool expanded: false
     property int view: 0
+    readonly property int viewCount: PanelCatalog.names.length
 
     readonly property bool surfaceFollowsIsland: IslandSettings.morphApproach === 0
 
@@ -19,59 +19,55 @@ PanelWindow {
 
     anchors {
         top: true
-        left: true
+        left: !root.surfaceFollowsIsland
         right: !root.surfaceFollowsIsland
     }
     margins {
         top: 8
+        left: root.surfaceFollowsIsland
+            ? Math.round((screen.width - island.width) / 2)
+            : 0
     }
 
     Island {
         id: island
         anchors.horizontalCenter: parent.horizontalCenter
-        expanded: root.expanded
         view: root.view
         animateSelf: !root.surfaceFollowsIsland
+        status: root.isled.connected
+            ? "isled · " + (root.isled.snapshot?.session?.compositor ?? "?") + " · " + root.isled.tickCount
+            : "isled offline"
+    }
+
+    function setExpanded(value) {
+        island.expanded = value;
+        if (!value)
+            island.collapse();
+    }
+
+    function toggleIsland() {
+        setExpanded(!island.expanded);
+    }
+
+    function showView(index) {
+        view = PanelCatalog.clamp(index);
+        setExpanded(true);
+    }
+
+    function stepView(delta) {
+        showView((view + delta + viewCount) % viewCount);
+    }
+
+    function focusProbe() {
+        island.grabFocus();
     }
 
     property IsledBridge isled: IsledBridge {
-        id: bridge
-
-        onToggleRequested: root.expanded = !root.expanded
+        onToggleRequested: root.toggleIsland()
         onViewRequested: (index) => {
-            root.view = index;
-            root.expanded = true;
+            root.showView(index);
         }
-    }
-
-    Loader {
-        anchors.fill: parent
-        sourceComponent: root.isled.connected ? statusOverlay : null
-    }
-
-    Component {
-        id: statusOverlay
-
-        Item {
-            anchors.fill: parent
-
-            Keys.onPressed: (event) => {
-                if (event.key === Qt.Key_Escape) {
-                    root.expanded = false;
-                    event.accepted = true;
-                }
-            }
-
-            Text {
-                anchors.centerIn: parent
-                color: Theme.textDim
-                font.family: "Inter"
-                font.pixelSize: 11
-                text: root.isled.connected
-                    ? "isled · " + (root.isled.snapshot?.session?.compositor ?? "?") + " · ticks " + root.isled.tickCount
-                    : "isled not reachable"
-            }
-        }
+        onFocusRequested: root.focusProbe()
     }
 
     Component.onCompleted: {
