@@ -68,6 +68,7 @@ PanelWindow {
             root.showView(index);
         }
         onFocusRequested: root.focusProbe()
+        onViewStepped: (delta) => root.stepView(delta)
     }
 
     Component.onCompleted: {

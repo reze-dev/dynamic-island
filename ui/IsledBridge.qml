@@ -21,6 +21,7 @@ QtObject {
     property int nextId: 1
 
     signal viewRequested(int index)
+    signal viewStepped(int delta)
     signal toggleRequested()
     signal focusRequested()
 
@@ -74,6 +75,8 @@ QtObject {
                 tickCount++;
             else if (message.topic === "view.set")
                 viewRequested(message.data.index | 0);
+            else if (message.topic === "view.step")
+                viewStepped(message.data.delta | 0);
             else if (message.topic === "island.toggle")
                 toggleRequested();
             else if (message.topic === "island.focus")

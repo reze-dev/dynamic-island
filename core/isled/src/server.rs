@@ -160,6 +160,14 @@ impl Server {
                 let _ = self.events.send(ServerMessage::event("view.set", topic));
                 ServerMessage::reply_ok(id)
             }
+            "view.prev" | "view.next" => {
+                let delta = if name == "view.next" { 1 } else { -1 };
+                let _ = self.events.send(ServerMessage::event(
+                    "view.step",
+                    serde_json::json!({ "delta": delta }),
+                ));
+                ServerMessage::reply_ok(id)
+            }
             "island.toggle" => {
                 let _ = self
                     .events
