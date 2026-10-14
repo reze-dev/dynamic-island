@@ -8,6 +8,7 @@ FocusScope {
     property bool showPlaceholder: input.text.length === 0
 
     signal submitted(string value)
+    signal escapePressed()
 
     implicitWidth: input.implicitWidth
     implicitHeight: input.implicitHeight
@@ -26,7 +27,7 @@ FocusScope {
         onAccepted: scope.submitted(text)
 
         Keys.onEscapePressed: {
-            scope.focus = false;
+            scope.escapePressed();
             event.accepted = true;
         }
     }

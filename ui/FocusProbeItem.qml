@@ -6,6 +6,7 @@ Item {
     property alias typed: field.text
     readonly property bool hasFocus: field.activeFocus
     signal submitted(string value)
+    signal escapePressed()
 
     width: 420
     height: 44
@@ -38,5 +39,6 @@ Item {
         anchors.margins: 11
         placeholder: "focus probe — Esc to release"
         onSubmitted: (value) => probe.submitted(value)
+        onEscapePressed: probe.escapePressed()
     }
 }

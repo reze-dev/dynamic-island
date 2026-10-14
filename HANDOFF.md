@@ -400,3 +400,37 @@ top. Treat "island done" and "Ryoku gone" as separate milestones.
 Every phase is independently shippable. The most likely reason this slips is
 scope — nine panels plus the wallpaper system plus a shell migration — not
 difficulty in any one piece.
+### 4.10 Two Quickshell limits that shape the whole UI
+
+Both of these exist in Quickshell's *internal*
+`Quickshell/Wayland/_WlrLayerShell` module but **are not exposed on
+`PanelWindow` in 0.3.0 or 0.3.2**. Verified by trying both — each fails with
+"Cannot assign to non-existent property".
+
+**1. There is no way to request compositor keyboard focus.**
+
+`PanelWindowInterface` exposes only `anchors`, `margins`, `exclusiveZone`,
+`exclusionMode`, `aboveWindows`, `focusable`. `WlrKeyboardFocus` (None /
+Exclusive / OnDemand) is internal. `focusable: true` gives on-demand focus,
+which niri grants **only on click**.
+
+Measured consequence: a keybind-expanded panel cannot take focus.
+`forceActiveFocus()` works *within* the QML window but does not make the window
+itself focused, so typing goes to whatever was focused before — usually the
+terminal. Clicking a text field works. `Esc` only reaches the island once
+something inside it has been clicked.
+
+So the Phase 0 goal "never steals focus" is trivially met, because the island
+never has focus at all. Text entry (todos, notes, calendar) will be
+click-to-focus until Quickshell exposes `keyboardFocus`, or we patch it.
+
+**2. The layer namespace cannot be set.**
+
+Every Quickshell surface is `namespace="quickshell"`; `PanelWindow` has no
+`namespace` property. This kills the compositor-side blur plan while any other
+Quickshell shell is running — a `layer-rule` on `namespace="quickshell"` would
+hit Ryoku's surfaces too. The only targetable rule is `match layer="top"`,
+which blurs everything on that layer.
+
+Both limits disappear at Ryoku cutover, which is another reason the cutover
+matters more than the island itself.

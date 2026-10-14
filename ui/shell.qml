@@ -40,13 +40,15 @@ PanelWindow {
     }
 
     function setExpanded(value) {
-        island.expanded = value;
-        if (!value)
-            island.collapse();
+        island.setExpanded(value);
     }
 
     function toggleIsland() {
-        setExpanded(!island.expanded);
+        island.setExpanded(!island.expanded);
+    }
+
+    function focusProbe() {
+        island.grabFocus();
     }
 
     function showView(index) {
@@ -58,17 +60,13 @@ PanelWindow {
         showView((view + delta + viewCount) % viewCount);
     }
 
-    function focusProbe() {
-        island.grabFocus();
-    }
-
     property IsledBridge isled: IsledBridge {
         onToggleRequested: root.toggleIsland()
         onViewRequested: (index) => {
             root.showView(index);
         }
-        onFocusRequested: root.focusProbe()
         onViewStepped: (delta) => root.stepView(delta)
+        onFocusRequested: root.focusProbe()
     }
 
     Component.onCompleted: {

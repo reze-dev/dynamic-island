@@ -47,7 +47,8 @@ Rectangle {
     MouseArea {
         anchors.fill: parent
         z: -1
-        onClicked: island.expanded = !island.expanded
+        enabled: !island.expanded
+        onClicked: island.setExpanded(true)
     }
 
     Text {
@@ -68,8 +69,8 @@ Rectangle {
         anchors.fill: parent
         view: island.view
         opacity: island.expanded ? 1 : 0
-        visible: opacity > 0
-        enabled: opacity > 0
+        visible: island.expanded
+        enabled: island.expanded
 
         Behavior on opacity {
             NumberAnimation {
@@ -88,8 +89,10 @@ Rectangle {
         width: Math.min(440, parent.width - Theme.spacingLoose * 2)
         height: 44
         opacity: island.expanded ? 1 : 0
-        visible: opacity > 0
-        enabled: opacity > 0
+        visible: island.expanded
+        enabled: island.expanded
+
+        onEscapePressed: island.collapse()
 
         Behavior on opacity {
             NumberAnimation {
@@ -111,8 +114,12 @@ Rectangle {
 
     function setExpanded(value) {
         expanded = value;
-        if (!value)
+        if (value) {
+            if (IslandSettings.focusOnExpand)
+                Qt.callLater(probe.grabFocus);
+        } else {
             probe.releaseFocus();
+        }
     }
 
     Keys.onEscapePressed: {
