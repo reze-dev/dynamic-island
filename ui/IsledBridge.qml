@@ -14,6 +14,7 @@ QtObject {
 
     property bool connected: socket.connected
     property var snapshot: ({})
+    property var stats: ({})
     property int tickCount: 0
     property string lastTopic: ""
     property string lastError: ""
@@ -71,8 +72,10 @@ QtObject {
             snapshot = message.data;
         } else if (message.t === "event") {
             lastTopic = message.topic;
-            if (message.topic === "session.tick")
+            if (message.topic === "system.stats") {
+                stats = message.data;
                 tickCount++;
+            }
             else if (message.topic === "view.set")
                 viewRequested(message.data.index | 0);
             else if (message.topic === "view.step")

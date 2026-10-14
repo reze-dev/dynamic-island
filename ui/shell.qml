@@ -29,6 +29,7 @@ PanelWindow {
             : 0
     }
 
+
     Island {
         id: island
         anchors.horizontalCenter: parent.horizontalCenter

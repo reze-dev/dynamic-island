@@ -1,20 +1,31 @@
 import QtQuick
+import "panels"
 
 Item {
     id: host
 
     property int view: 0
+    property var stats: ({})
+    property var snapshot: ({})
 
-    readonly property string title: PanelCatalog.names[view] ?? "?"
-    readonly property string subtitle: PanelCatalog.subtitles[view] ?? ""
+    readonly property bool hasContext: host.view === 0
+
+    ContextPanel {
+        anchors.fill: parent
+        visible: host.hasContext
+        enabled: host.hasContext
+        stats: host.stats
+        snapshot: host.snapshot
+    }
 
     Column {
         anchors.fill: parent
         anchors.margins: Theme.spacingLoose
         spacing: Theme.spacing
+        visible: !host.hasContext
 
         Text {
-            text: host.title
+            text: PanelCatalog.names[host.view] ?? "?"
             color: Theme.text
             font.family: "Inter"
             font.pixelSize: 24
@@ -22,28 +33,24 @@ Item {
         }
 
         Text {
-            text: host.subtitle
+            width: parent.width
+            wrapMode: Text.WordWrap
             color: Theme.textDim
             font.family: "Inter"
             font.pixelSize: 13
-        }
-
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Theme.border
+            text: PanelCatalog.subtitles[host.view] ?? ""
         }
 
         Text {
-            text: "Mod+Alt+" + (host.view + 1) + " · placeholder — phase 1"
             color: Theme.textDim
             font.family: "Inter"
             font.pixelSize: 12
+            text: "Mod+Ctrl+" + (host.view + 1) + " · placeholder"
         }
 
         Item {
             width: parent.width
-            height: parent.height - y
+            height: 1
         }
     }
 }

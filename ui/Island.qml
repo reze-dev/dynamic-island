@@ -68,6 +68,8 @@ Rectangle {
 
         anchors.fill: parent
         view: island.view
+        stats: root.isled.stats
+        snapshot: root.isled.snapshot
         opacity: island.expanded ? 1 : 0
         visible: island.expanded
         enabled: island.expanded

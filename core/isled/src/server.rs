@@ -1,5 +1,6 @@
 use crate::paths::socket_path;
-use isle_core::{ClientMessage, ServerMessage, Session, Snapshot};
+use crate::stats::Sampler;
+use isle_core::{ClientMessage, ServerMessage, Session, Snapshot, SystemStats};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -14,9 +15,9 @@ pub type Events = broadcast::Sender<ServerMessage>;
 pub struct Server {
     socket: PathBuf,
     snapshot: Snapshot,
+    stats: tokio::sync::Mutex<Sampler>,
     events: Events,
     shutdown: tokio::sync::Notify,
-    started_at: u64,
 }
 
 impl Server {
@@ -29,9 +30,9 @@ impl Server {
         Arc::new(Self {
             socket,
             snapshot: snapshot(),
+            stats: tokio::sync::Mutex::new(Sampler::new()),
             events,
             shutdown: tokio::sync::Notify::new(),
-            started_at: isle_core::state::unix_now(),
         })
     }
 
@@ -91,14 +92,24 @@ impl Server {
 
     async fn tick_forever(&self) {
         let mut ticker = tokio::time::interval(TICK_INTERVAL);
+        let stats = self.sample().await;
+        let _ = self.events.send(ServerMessage::event(
+            "system.stats",
+            serde_json::to_value(&stats).unwrap_or_default(),
+        ));
+
         loop {
             ticker.tick().await;
-            let uptime = isle_core::state::unix_now().saturating_sub(self.started_at);
+            let stats = self.sample().await;
             let _ = self.events.send(ServerMessage::event(
-                "session.tick",
-                serde_json::json!({ "uptime_secs": uptime }),
+                "system.stats",
+                serde_json::to_value(&stats).unwrap_or_default(),
             ));
         }
+    }
+
+    async fn sample(&self) -> SystemStats {
+        self.stats.lock().await.sample()
     }
 
     async fn handle_connection(&self, stream: UnixStream) {
@@ -127,7 +138,7 @@ impl Server {
                         continue;
                     }
                     let reply = match serde_json::from_str::<ClientMessage>(&line) {
-                        Ok(message) => self.dispatch(message),
+                        Ok(message) => self.dispatch(message).await,
                         Err(err) => ServerMessage::reply_err(0, format!("malformed command: {err}")),
                     };
                     write_half.write_all(reply.encode().as_bytes()).await?;
@@ -147,10 +158,23 @@ impl Server {
         }
     }
 
-    fn dispatch(&self, message: ClientMessage) -> ServerMessage {
+    async fn dispatch(&self, message: ClientMessage) -> ServerMessage {
         let ClientMessage::Cmd { id, name, args } = message;
         match name.as_str() {
             "ping" => ServerMessage::reply_ok(id),
+            "system.stats" => {
+                let stats = self.sample().await;
+                let reply = ServerMessage::Reply {
+                    id,
+                    ok: true,
+                    error: None,
+                };
+                let _ = self.events.send(ServerMessage::event(
+                    "system.stats",
+                    serde_json::to_value(&stats).unwrap_or_default(),
+                ));
+                reply
+            }
             "view.set" => {
                 let index = args
                     .get("index")
@@ -217,25 +241,29 @@ mod tests {
         std::env::temp_dir().join(format!("isled-{name}-{}", std::process::id()))
     }
 
-    #[test]
-    fn ping_is_answered() {
+    #[tokio::test]
+    async fn ping_is_answered() {
         let server = Server::with_socket(PathBuf::from("/dev/null"));
-        let reply = server.dispatch(ClientMessage::Cmd {
-            id: 1,
-            name: "ping".into(),
-            args: serde_json::Value::Null,
-        });
+        let reply = server
+            .dispatch(ClientMessage::Cmd {
+                id: 1,
+                name: "ping".into(),
+                args: serde_json::Value::Null,
+            })
+            .await;
         assert_eq!(reply, ServerMessage::reply_ok(1));
     }
 
-    #[test]
-    fn unknown_commands_fail_loudly_rather_than_silently() {
+    #[tokio::test]
+    async fn unknown_commands_fail_loudly_rather_than_silently() {
         let server = Server::with_socket(PathBuf::from("/dev/null"));
-        let reply = server.dispatch(ClientMessage::Cmd {
-            id: 9,
-            name: "volume.set".into(),
-            args: serde_json::json!({ "level": 0.4 }),
-        });
+        let reply = server
+            .dispatch(ClientMessage::Cmd {
+                id: 9,
+                name: "volume.set".into(),
+                args: serde_json::json!({ "level": 0.4 }),
+            })
+            .await;
         assert_eq!(
             reply,
             ServerMessage::reply_err(9, "unknown command: volume.set")
@@ -337,7 +365,7 @@ mod tests {
         assert!(
             matches!(
                 serde_json::from_str::<ServerMessage>(line.trim()).unwrap(),
-                ServerMessage::Event { ref topic, .. } if topic == "session.tick"
+                ServerMessage::Event { ref topic, .. } if topic == "system.stats"
             ),
             "got: {line}"
         );

@@ -2,6 +2,7 @@
 
 mod paths;
 mod server;
+mod stats;
 
 use isle_core::{ClientMessage, ServerMessage};
 use paths::{Args, parse_args, parse_args_json, socket_path};
