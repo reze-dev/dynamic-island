@@ -5,9 +5,12 @@ import Quickshell.Io
 QtObject {
     id: bridge
 
-    readonly property string socketPath: Quickshell.env("ISLED_SOCKET") !== ""
-        ? Quickshell.env("ISLED_SOCKET")
-        : Quickshell.env("XDG_RUNTIME_DIR") + "/isled/isled.sock"
+    readonly property string explicitSocket: Quickshell.env("ISLED_SOCKET")
+    readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR")
+
+    readonly property string socketPath: (explicitSocket !== undefined && explicitSocket.length > 0)
+        ? explicitSocket
+        : runtimeDir + "/isled/isled.sock"
 
     property bool connected: socket.connected
     property var snapshot: ({})
@@ -66,9 +69,6 @@ QtObject {
 
         if (message.t === "state") {
             snapshot = message.data;
-            console.log("[isle] snapshot: compositor=" + (message.data?.session?.compositor ?? "?")
-                + " wayland=" + (message.data?.session?.wayland_display ?? "?")
-                + " version=" + message.data?.version);
         } else if (message.t === "event") {
             lastTopic = message.topic;
             if (message.topic === "session.tick")
