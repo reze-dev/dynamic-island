@@ -1,0 +1,19 @@
+[package]
+name = "isled"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Session daemon for the Dynamic Island Shell"
+
+[[bin]]
+name = "isled"
+path = "src/main.rs"
+
+[dependencies]
+isle-core = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

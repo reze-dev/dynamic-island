@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>ctOS · Dynamic Island Concept</title>
+  <meta name="description" content="A desktop-first, interactive Dynamic Island concept for ctOS, inspired by Apple's compact and expanded Live Activity patterns." />
+  <style>
+    :root {
+      --base: #191724;
+      --surface: #1f1d2e;
+      --overlay: #26233a;
+      --muted: #6e6a86;
+      --subtle: #908caa;
+      --text: #e0def4;
+      --love: #eb6f92;
+      --gold: #f6c177;
+      --rose: #ebbcba;
+      --pine: #31748f;
+      --foam: #9ccfd8;
+      --iris: #c4a7e7;
+      --leaf: #a3be8c;
+      --border: rgba(224, 222, 244, .10);
+      --shadow: 0 28px 100px rgba(0,0,0,.42), 0 4px 22px rgba(0,0,0,.22);
+      --island-width: 300px;
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+    body {
+      background: var(--base);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, textarea { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--iris); outline-offset: 3px; }
+    .desktop {
+      min-height: 100vh;
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      background:
+        radial-gradient(ellipse at 18% 78%, rgba(49,116,143,.20), transparent 38%),
+        radial-gradient(ellipse at 80% 18%, rgba(196,167,231,.14), transparent 34%),
+        radial-gradient(ellipse at 54% 105%, rgba(235,111,146,.10), transparent 38%),
+        linear-gradient(135deg, #191724 0%, #1f1d2e 52%, #191724 100%);
+    }
+    .desktop::before, .desktop::after {
+      content: ""; position: absolute; pointer-events: none; z-index: -1;
+      border: 1px solid rgba(224,222,244,.045); border-radius: 50%;
+      width: 66vw; height: 66vw; min-width: 700px; min-height: 700px;
+      left: -21vw; bottom: -43vw; transform: rotate(-24deg);
+    }
+    .desktop::after {
+      width: 48vw; height: 48vw; min-width: 530px; min-height: 530px;
+      left: auto; right: -16vw; bottom: -30vw; border-color: rgba(156,207,216,.07);
+    }
+    .grain {
+      position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .13;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.2'/%3E%3C/svg%3E");
+    }
+    .top-meta {
+      position: absolute; top: 26px; left: 34px; right: 34px;
+      display: flex; align-items: center; justify-content: space-between;
+      color: var(--subtle); font-size: 12px; letter-spacing: .02em;
+    }
+    .brand { display:flex; align-items:center; gap:10px; color:var(--text); font-weight:650; letter-spacing:.08em; }
+    .brand-mark { width:9px; height:9px; border-radius:50%; background:var(--iris); box-shadow:0 0 18px rgba(196,167,231,.6); }
+    .system-meta { display:flex; gap:17px; align-items:center; }
+    .status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--leaf); margin-right:7px; }
+    .center-note {
+      position: absolute; left: 50%; top: 48%; transform: translate(-50%,-50%);
+      width: min(620px, 90vw); text-align: center; pointer-events: none; opacity: .75;
+    }
+    .eyebrow { color:var(--iris); font-size:11px; text-transform:uppercase; letter-spacing:.24em; font-weight:700; }
+    .center-note h1 { margin: 18px 0 12px; font-size: clamp(36px, 5.5vw, 66px); letter-spacing:-.065em; line-height:.98; font-weight:650; }
+    .center-note p { color:var(--subtle); margin:0 auto; max-width:410px; font-size:14px; line-height:1.7; }
+    .hint {
+      position:absolute; bottom:32px; left:50%; transform:translateX(-50%);
+      color:rgba(224,222,244,.45); font-size:11px; letter-spacing:.12em; text-transform:uppercase; white-space:nowrap;
+    }
+    .island-anchor {
+      position:absolute; z-index:10; top:16px; left:50%; transform:translateX(-50%);
+      display:flex; align-items:flex-start; justify-content:center; width:min(94vw, 720px);
+      pointer-events:none;
+    }
+    .island {
+      pointer-events:auto; position:relative; width:var(--island-width); min-height:60px;
+      border-radius:32px; background:#050507; color:#f7f5ff;
+      border:1px solid rgba(255,255,255,.09);
+      box-shadow: 0 8px 28px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.07);
+      transition: width .42s cubic-bezier(.2,.85,.2,1), border-radius .35s ease, min-height .35s ease, transform .35s ease;
+      overflow:hidden; transform-origin:top center;
+    }
+    .island.expanded { width:min(510px, calc(100vw - 28px)); min-height:190px; border-radius:27px; }
+    .island[data-view="notes"].expanded, .island[data-view="calendar"].expanded { min-height:300px; }
+    .island[data-view="clipboard"].expanded { min-height:250px; }
+    .island[data-view="notifications"].expanded { min-height:270px; }
+    .island.compact:hover { border-color:rgba(196,167,231,.30); }
+    .island-top {
+      min-height:58px; display:flex; align-items:center; gap:10px; padding:9px 14px;
+      cursor:pointer; user-select:none;
+    }
+    .island.expanded .island-top { cursor:default; border-bottom:1px solid rgba(255,255,255,.07); }
+    .cover {
+      width:38px; height:38px; flex:0 0 38px; border-radius:12px; overflow:hidden;
+      display:grid; place-items:center; color:#191724;
+      background:linear-gradient(135deg,#ebbcba,#c4a7e7 52%,#31748f);
+    }
+    .cover svg { width:20px; height:20px; }
+    .mini-bars { display:flex; align-items:center; justify-content:center; gap:3px; height:25px; width:24px; }
+    .mini-bars i { display:block; width:3px; border-radius:4px; background:var(--iris); animation:wave 1.1s ease-in-out infinite alternate; }
+    .mini-bars i:nth-child(1){height:8px;animation-delay:-.4s}.mini-bars i:nth-child(2){height:17px;animation-delay:-.1s}.mini-bars i:nth-child(3){height:12px;animation-delay:-.7s}.mini-bars i:nth-child(4){height:21px;animation-delay:-.2s}
+    .paused .mini-bars i { animation-play-state:paused; height:5px !important; }
+    @keyframes wave { from { transform:scaleY(.48); opacity:.65 } to { transform:scaleY(1); opacity:1 } }
+    .track { flex:1; min-width:0; }
+    .track-title { font-size:12px; font-weight:650; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .track-sub { color:#8f8c9e; font-size:10px; margin-top:4px; }
+    .island-actions { display:flex; align-items:center; gap:7px; }
+    .icon-button {
+      display:grid; place-items:center; width:31px; height:31px; border:0; border-radius:50%;
+      background:transparent; color:#c7c4d4; cursor:pointer; transition:background .18s,color .18s;
+    }
+    .icon-button:hover { background:rgba(255,255,255,.09); color:white; }
+    .icon-button svg { width:16px; height:16px; }
+
+    .module-actions { gap:3px; }
+    .module-button {
+      display:grid; place-items:center; width:29px; height:29px; border:0; border-radius:50%;
+      background:transparent; color:#777387; cursor:pointer; transition:background .18s,color .18s;
+    }
+    .module-button:hover { background:rgba(255,255,255,.06); color:#c8c4d8; }
+    .module-button.selected { color:#c4a7e7; background:rgba(196,167,231,.13); }
+    .module-button svg { width:14px; height:14px; }
+
+    .compact-right { display:flex; align-items:center; gap:8px; margin-left:auto; }
+    .compact-time { color:#8e8a9f; font-size:10px; font-variant-numeric:tabular-nums; }
+    .island-body { padding:15px 17px 17px; animation:appear .22s ease both; }
+    @keyframes appear { from { opacity:0; transform:translateY(-4px) } to { opacity:1; transform:translateY(0) } }
+    .panel-heading { display:flex; justify-content:space-between; align-items:center; margin:0 0 13px; }
+    .panel-heading h2 { margin:0; font-size:13px; font-weight:650; letter-spacing:-.02em; }
+    .muted { color:#8f8b9f; font-size:11px; }
+    .media-layout { display:grid; grid-template-columns:100px 1fr; gap:17px; align-items:center; }
+    .album-art {
+      width:100px; height:100px; border-radius:17px; display:grid; place-items:center; position:relative; overflow:hidden;
+      background:linear-gradient(145deg,#f6c177,#eb6f92 42%,#c4a7e7 78%,#31748f);
+      box-shadow:0 9px 28px rgba(196,167,231,.13);
+    }
+    .album-art::before { content:""; position:absolute; width:75px;height:75px;border:1px solid rgba(255,255,255,.42);border-radius:50%; }
+    .album-art::after { content:""; position:absolute; width:46px;height:46px;border:1px solid rgba(255,255,255,.38);border-radius:50%; }
+    .album-art svg { width:26px;height:26px;z-index:1; filter:drop-shadow(0 2px 5px rgba(0,0,0,.2)); }
+    .media-info h3 { font-size:15px; margin:0 0 5px; letter-spacing:-.03em; }
+    .media-info p { font-size:11px; color:#9691a7; margin:0; }
+    .progress { height:3px; background:rgba(255,255,255,.13); border-radius:4px; margin:16px 0 7px; overflow:hidden; }
+    .progress-fill { height:100%; background:#f5f1ff; border-radius:4px; transition:width .3s; }
+    .time-row { display:flex; justify-content:space-between; color:#777387; font-size:9px; font-variant-numeric:tabular-nums; }
+    .transport { display:flex; align-items:center; justify-content:center; gap:18px; margin-top:12px; }
+    .transport .icon-button { width:34px;height:34px; }
+    .transport .play { background:#f3f0fb; color:#14121a; width:39px;height:39px; }
+    .transport .play:hover { background:white; }
+    .transport .play svg { width:17px;height:17px; }
+    .quick-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .quick-card { border:1px solid var(--border); background:rgba(255,255,255,.035); border-radius:15px; min-height:91px; padding:13px 12px; text-align:left; cursor:pointer; transition:background .18s,border-color .18s,transform .18s; }
+    .quick-card:hover { background:rgba(196,167,231,.09); border-color:rgba(196,167,231,.24); transform:translateY(-1px); }
+    .quick-card .qicon { width:31px;height:31px;border-radius:10px;display:grid;place-items:center;margin-bottom:12px; }
+    .qicon svg { width:16px;height:16px; }
+    .quick-card strong { display:block;font-size:11px;font-weight:600; }
+    .quick-card small { display:block;color:#8f8b9f;font-size:10px;margin-top:4px; }
+    .lavender { background:rgba(196,167,231,.15);color:var(--iris) }.blue { background:rgba(156,207,216,.13);color:var(--foam) }.pink { background:rgba(235,111,146,.13);color:var(--love) }.gold { background:rgba(246,193,119,.13);color:var(--gold) }.green { background:rgba(163,190,140,.13);color:var(--leaf) }
+    .list { display:flex; flex-direction:column; gap:7px; }
+    .list-item { display:flex; align-items:center; gap:10px; padding:10px 11px; border-radius:12px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.045); }
+    .list-icon { width:31px;height:31px;flex:0 0 31px;border-radius:10px;display:grid;place-items:center;background:rgba(196,167,231,.12);color:var(--iris); }
+    .list-icon svg { width:15px;height:15px; }
+    .list-copy { flex:1;min-width:0; }
+    .list-copy strong { display:block;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .list-copy small { display:block;font-size:10px;color:#8f8b9f;margin-top:4px; }
+    .pill { font-size:9px;color:var(--foam);border:1px solid rgba(156,207,216,.2);background:rgba(156,207,216,.08);border-radius:99px;padding:4px 7px;white-space:nowrap; }
+    .small-action { border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,.045); color:#c9c5d8; font-size:10px; padding:7px 9px; cursor:pointer; }
+    .small-action:hover { background:rgba(255,255,255,.09); }
+    .clipboard-list { display:flex;flex-direction:column;gap:7px; }
+    .clip-item { display:flex;gap:10px;align-items:center;padding:10px 11px;background:rgba(255,255,255,.035);border-radius:11px; }
+    .clip-text { flex:1;min-width:0;font-size:11px;color:#c8c4d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .clip-type { color:#8f8b9f;font-size:9px; text-transform:uppercase;letter-spacing:.08em; }
+    .note-area { width:100%;min-height:120px;resize:vertical;background:rgba(255,255,255,.035);border:1px solid var(--border);border-radius:13px;padding:12px;color:var(--text);font-size:12px;line-height:1.65; }
+    .note-footer { display:flex;justify-content:space-between;align-items:center;margin-top:9px; }
+    .calendar-layout { display:grid;grid-template-columns:1fr 1.2fr;gap:15px; }
+    .calendar-card { padding:12px;border-radius:13px;background:rgba(255,255,255,.035);border:1px solid var(--border); }
+    .calendar-month { display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:600;margin-bottom:12px; }
+    .days { display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center; }
+    .day { display:grid;place-items:center;aspect-ratio:1;border-radius:8px;color:#a29db3;font-size:9px; }
+    .day.head { color:#666278;font-size:8px; }
+    .day.selected { background:var(--iris);color:#191724;font-weight:700; }
+    .day.has-event:not(.selected)::after { content:"";width:3px;height:3px;background:var(--foam);border-radius:50%;position:absolute;margin-top:15px; }
+    .event-list { display:flex;flex-direction:column;gap:9px; }
+    .event { display:flex;gap:10px;align-items:flex-start; }
+    .event-time { color:var(--foam);font-size:10px;min-width:42px;padding-top:2px;font-variant-numeric:tabular-nums; }
+    .event-line { width:2px;align-self:stretch;background:rgba(156,207,216,.35);border-radius:3px; }
+    .event strong { display:block;font-size:11px;font-weight:600; }
+    .event small { display:block;color:#8f8b9f;font-size:10px;margin-top:4px; }
+    .notice { display:flex;gap:11px;padding:12px;background:rgba(255,255,255,.035);border:1px solid var(--border);border-radius:13px;margin-bottom:8px; }
+    .notice-mark { width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex:0 0 34px; }
+    .notice-mark svg { width:16px;height:16px; }
+    .notice-content { flex:1;min-width:0; }
+    .notice-title { display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:650; }
+    .notice-title time { color:#777387;font-size:9px;font-weight:400;white-space:nowrap; }
+    .notice p { font-size:10px;line-height:1.5;color:#a29db3;margin:5px 0 0; }
+    .empty { text-align:center;color:#8f8b9f;font-size:11px;padding:25px 10px; }
+    .toast {
+      position:fixed;z-index:30;left:50%;bottom:24px;transform:translate(-50%,12px);
+      padding:11px 15px;border:1px solid rgba(224,222,244,.12);border-radius:12px;
+      background:#26233a;color:#e0def4;font-size:11px;box-shadow:var(--shadow);
+      opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
+    }
+    .toast.show { opacity:1;transform:translate(-50%,0); }
+    .help {
+      position:absolute;right:32px;bottom:28px;display:flex;gap:7px;align-items:center;color:rgba(224,222,244,.38);font-size:10px;
+    }
+    kbd { font:inherit;font-size:9px;border:1px solid rgba(224,222,244,.15);border-radius:5px;padding:3px 5px;color:rgba(224,222,244,.55); }
+    .context-strip { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+    .context-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 8px; border-radius:999px; border:1px solid rgba(224,222,244,.10); background:rgba(255,255,255,.035); color:#a29db3; font-size:9px; }
+    .context-chip .signal { width:5px; height:5px; border-radius:50%; background:var(--leaf); }
+    .context-chip.warn .signal { background:var(--gold); }
+    .context-chip.off .signal { background:var(--love); }
+    .context-toggle { display:flex; align-items:center; gap:7px; color:#9b96ad; font-size:10px; }
+    .context-toggle input { accent-color:var(--iris); }
+    .list-icon.green { background:rgba(163,190,140,.13);color:var(--leaf); }
+    .list-icon.pink { background:rgba(235,111,146,.13);color:var(--love); }
+    .context-detail { margin-top:12px; padding:10px 11px; border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,.025); color:#aaa5ba; font-size:10px; line-height:1.6; }
+    .mobile-warning { display:none; }
+    @media (max-width:650px) {
+      .top-meta { top:18px;left:17px;right:17px; }
+      .system-meta { gap:8px; }
+      .system-meta .optional { display:none; }
+      .island-anchor { top:12px;width:100%; }
+      .island.expanded { width:calc(100vw - 20px); }
+      .module-actions { gap:1px; }
+      .module-button { width:26px; height:28px; }
+      .island.expanded .island-top { gap:7px; padding-left:11px; padding-right:10px; }
+      .island.expanded .cover { width:32px; height:32px; flex-basis:32px; border-radius:10px; }
+      .island.expanded .track-sub { display:none; }
+      .center-note { top:52%; }
+      .center-note h1 { font-size:42px; }
+      .calendar-layout { grid-template-columns:1fr; }
+      .calendar-card { display:none; }
+      .quick-card { min-height:84px;padding:10px; }
+      .hint { bottom:22px;font-size:9px; }
+      .help { display:none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="desktop" id="root">
+    <div class="grain"></div>
+    <header class="top-meta">
+      <div class="brand"><span class="brand-mark"></span><span>ctOS</span><span style="color:var(--muted);font-weight:400">/ CONCEPT 01</span></div>
+      <div class="system-meta"><span><i class="status-dot"></i>All systems quiet</span><span class="optional">WAYLAND · DESKTOP</span><span id="clock">18:42</span></div>
+    </header>
+    <section class="center-note" aria-hidden="true">
+      <div class="eyebrow">A quieter desktop</div>
+      <h1>Useful when<br/>you need it.</h1>
+      <p>A small surface for live activity and quick tools. Everything else stays out of the way.</p>
+    </section>
+    <div class="hint">Click the island to expand · Select a module · Press Esc to collapse</div>
+    <div class="help"><kbd>⌘</kbd><kbd>J</kbd><span>toggle island</span><kbd>1</kbd>–<kbd>7</kbd><span>switch views</span></div>
+    <div class="island-anchor" id="island-anchor"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </main>
+  <script type="module">
+    import React, { useState, useEffect } from "https://esm.sh/react@19.1.0";
+    import { createRoot } from "https://esm.sh/react-dom@19.1.0/client";
+
+    const h = React.createElement;
+    const icons = {
+      music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+      clipboard: '<rect x="8" y="4" width="12" height="16" rx="2"/><path d="M16 4V3a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h3"/>',
+      calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',
+      note: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/>',
+      bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>',
+      play: '<path d="m7 4 14 8-14 8z" fill="currentColor" stroke="none"/>',
+      pause: '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>',
+      prev: '<path d="M19 20 9 12l10-8z" fill="currentColor" stroke="none"/><path d="M5 19V5"/>',
+      next: '<path d="m5 4 10 8-10 8z" fill="currentColor" stroke="none"/><path d="M19 5v14"/>',
+      close: '<path d="m18 6-12 12M6 6l12 12"/>',
+      chevron: '<path d="m6 9 6 6 6-6"/>',
+      arrow: '<path d="M7 17 17 7M7 7h10v10"/>',
+      check: '<path d="m5 12 4 4L19 6"/>',
+      copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
+      sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>',
+      wifi: '<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>',
+      disc: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="m5 5 2 2m10 10 2 2"/>',
+      spark: '<path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3Z"/><path d="m19 14 1.2 2.8L23 18l-2.8 1.2L19 22l-1.2-2.8L15 18l2.8-1.2L19 14Z"/>',
+      moon: '<path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>',
+      clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+      download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>'
+    };
+    function Icon({name, size=16}) {
+      return h('svg', {width:size,height:size,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.7,strokeLinecap:'round',strokeLinejoin:'round',dangerouslySetInnerHTML:{__html:icons[name]||icons.spark},'aria-hidden':'true'});
+    }
+    function App() {
+      const [expanded,setExpanded] = useState(false);
+      const [view,setView] = useState('context');
+      const [playing,setPlaying] = useState(true);
+      const [track,setTrack] = useState(0);
+      const [toast,setToast] = useState('');
+      const [clips,setClips] = useState([
+        {type:'TEXT',text:'nix develop .#devShells.x86_64-linux.default'},
+        {type:'URL',text:'https://quickshell.org/'},
+        {type:'TEXT',text:'systemctl --user status ctos.service'}
+      ]);
+      const [note,setNote] = useState('Ideas for ctOS\\n\\n• Keep the island small and contextual\\n• Let Nix own configuration\\n• Prefer existing services over custom daemons');
+      const [savedNote,setSavedNote] = useState(true);
+      const [cleared,setCleared] = useState(false);
+      const [online,setOnline] = useState(navigator.onLine);
+      const [connection,setConnection] = useState(() => navigator.connection || navigator.mozConnection || navigator.webkitConnection || null);
+      const [contextEnabled,setContextEnabled] = useState(true);
+      const tracks = [
+        {title:'Glasshouse',artist:'Aether · Late Night Systems',length:'3:42',progress:38},
+        {title:'Soft Focus',artist:'Nia Archives · Fragments',length:'4:08',progress:61},
+        {title:'Afterimage',artist:'Tycho · Weather',length:'5:12',progress:22}
+      ];
+      const current = tracks[track];
+      const say = (message) => {
+        setToast(message);
+        window.clearTimeout(window.__ctosToast);
+        window.__ctosToast = window.setTimeout(()=>setToast(''),1900);
+      };
+      useEffect(()=>{
+        const tick=()=>{const d=new Date();document.getElementById('clock').textContent=d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12:false});};
+        tick();const id=window.setInterval(tick,30000);return ()=>window.clearInterval(id);
+      },[]);
+      useEffect(()=>{
+        const updateOnline=()=>setOnline(navigator.onLine);
+        const updateConnection=()=>setConnection(navigator.connection || navigator.mozConnection || navigator.webkitConnection || null);
+        window.addEventListener('online',updateOnline);window.addEventListener('offline',updateOnline);
+        if(connection && connection.addEventListener) connection.addEventListener('change',updateConnection);
+        return ()=>{window.removeEventListener('online',updateOnline);window.removeEventListener('offline',updateOnline);if(connection && connection.removeEventListener) connection.removeEventListener('change',updateConnection);};
+      },[connection]);
+      useEffect(()=>{
+        const views=['context','media','clipboard','calendar','notes','notifications','network'];
+        const onKey=(e)=>{
+          if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='j'){e.preventDefault();setExpanded(v=>!v);}
+          if(e.key==='Escape')setExpanded(false);
+          if(['1','2','3','4','5','6','7'].includes(e.key)&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)){setView(views[Number(e.key)-1]);setExpanded(true);}
+        };
+        window.addEventListener('keydown',onKey);return ()=>window.removeEventListener('keydown',onKey);
+      },[]);
+      const btn=(ico,label,fn,extra='')=>h('button',{className:'icon-button '+extra,onClick:(e)=>{e.stopPropagation();fn();},'aria-label':label,title:label},h(Icon,{name:ico,size:16}));
+      const heading=(title,right)=>h('div',{className:'panel-heading'},h('h2',null,title),right||h('span',{className:'muted'},'LOCAL'));
+      const mediaPanel=()=>h(React.Fragment,null,
+        heading('Now playing',h('span',{className:'pill'},'MPRIS · DEMO')),
+        h('div',{className:'media-layout'},
+          h('div',{className:'album-art'},h(Icon,{name:'disc',size:28})),
+          h('div',{className:'media-info'},
+            h('h3',null,current.title),h('p',null,current.artist),
+            h('div',{className:'progress'},h('div',{className:'progress-fill',style:{width:current.progress+'%'}})),
+            h('div',{className:'time-row'},h('span',null,'1:24'),h('span',null,current.length))
+          )
+        ),
+        h('div',{className:'transport'},
+          btn('prev','Previous track',()=>{setTrack((track+tracks.length-1)%tracks.length);say('Previous track');}),
+          btn(playing?'pause':'play',playing?'Pause':'Play',()=>setPlaying(!playing),'play'),
+          btn('next','Next track',()=>{setTrack((track+1)%tracks.length);say('Next track');})
+        )
+      );
+      const quickPanel=()=>h(React.Fragment,null,
+        heading('Quick tools',h('span',{className:'muted'},'4 AVAILABLE')),
+        h('div',{className:'quick-grid'},
+          ...[
+            ['clipboard','Clipboard','3 recent items','lavender',()=>setView('clipboard')],
+            ['calendar','Calendar','Next: 14:30','blue',()=>setView('calendar')],
+            ['note','Quick note','Autosave preview','pink',()=>setView('notes')],
+            ['bell','Notifications','2 unread','gold',()=>setView('notifications')],
+            ['sun','Appearance','Rose Pine','green',()=>say('Rose Pine is active')],
+            ['download','Downloads','2 in progress','blue',()=>say('Downloads panel is a prototype')]
+          ].map(([ico,title,sub,color,fn])=>h('button',{className:'quick-card',onClick:fn,key:title},
+            h('span',{className:'qicon '+color},h(Icon,{name:ico,size:16})),
+            h('strong',null,title),h('small',null,sub)
+          ))
+        )
+      );
+      const clipboardPanel=()=>h(React.Fragment,null,
+        heading('Clipboard history',h('button',{className:'small-action',onClick:()=>{setClips([]);say('Clipboard history cleared');}},'Clear history')),
+        h('div',{className:'clipboard-list'},
+          ...(clips.length?clips.map((c,i)=>h('div',{className:'clip-item',key:i},
+            h('span',{className:'clip-type'},c.type),
+            h('span',{className:'clip-text',title:c.text},c.text),
+            h('button',{className:'icon-button',onClick:()=>say('Copied to demo clipboard'),title:'Copy item','aria-label':'Copy item'},h(Icon,{name:'copy',size:14}))
+          )):[h('div',{className:'empty',key:'empty'},'Clipboard history is empty.')])
+        ),
+        h('div',{className:'note-footer'},h('span',{className:'muted'},'Demo data only · nothing leaves this page'),h('button',{className:'small-action',onClick:()=>{setClips([{type:'TEXT',text:'Hello from ctOS · '+new Date().toLocaleTimeString()} ,...clips]);say('Added sample clipboard item');}},'Add sample item'))
+      );
+      const calendarPanel=()=>h(React.Fragment,null,
+        heading('Today, Thursday 08 October',h('span',{className:'pill'},'2 EVENTS')),
+        h('div',{className:'calendar-layout'},
+          h('div',{className:'calendar-card'},
+            h('div',{className:'calendar-month'},h('span',null,'October 2026'),h('span',{className:'muted'},'‹   ›')),
+            h('div',{className:'days'},...['M','T','W','T','F','S','S'].map((d,i)=>h('div',{className:'day head',key:'h'+i},d)),...Array.from({length:35},(_,i)=>{let day=i-2;return h('div',{className:'day '+(day===8?'selected':'')+([8,12,19,23].includes(day)?' has-event':''),key:i},day>0&&day<=31?day:'');}))
+          ),
+          h('div',{className:'event-list'},
+            ...[
+              ['09:30','Platform sync','Infra team · 30 min'],
+              ['14:30','Review ctOS scope','Personal · 45 min'],
+              ['17:00','Read Rust','Learning · 1 hour']
+            ].map((e,i)=>h('div',{className:'event',key:e[0]},h('span',{className:'event-time'},e[0]),h('span',{className:'event-line'}),h('div',null,h('strong',null,e[1]),h('small',null,e[2]))))
+          )
+        )
+      );
+      const notesPanel=()=>h(React.Fragment,null,
+        heading('Quick note',h('span',{className:'pill'},savedNote?'SAVED LOCALLY · DEMO':'UNSAVED')),
+        h('textarea',{className:'note-area',value:note,onChange:e=>{setNote(e.target.value);setSavedNote(false);},'aria-label':'Quick note',spellCheck:false}),
+        h('div',{className:'note-footer'},h('span',{className:'muted'},'Prototype state · refresh resets note'),h('button',{className:'small-action',onClick:()=>{setSavedNote(true);say('Note saved in this prototype session');}},'Save note'))
+      );
+      const notificationsPanel=()=>h(React.Fragment,null,
+        heading('Notifications',h('button',{className:'small-action',onClick:()=>setCleared(true)},'Mark all read')),
+        !cleared?h(React.Fragment,null,
+          h('div',{className:'notice'},h('div',{className:'notice-mark lavender'},h(Icon,{name:'download',size:16})),h('div',{className:'notice-content'},h('div',{className:'notice-title'},h('span',null,'Build completed'),h('time',null,'2m')),h('p',null,'northstar · dev shell evaluated successfully.'))),
+          h('div',{className:'notice'},h('div',{className:'notice-mark blue'},h(Icon,{name:'bell',size:16})),h('div',{className:'notice-content'},h('div',{className:'notice-title'},h('span',null,'System update available'),h('time',null,'18m')),h('p',null,'12 packages are ready to update when convenient.'))),
+          h('div',{className:'notice'},h('div',{className:'notice-mark pink'},h(Icon,{name:'calendar',size:16})),h('div',{className:'notice-content'},h('div',{className:'notice-title'},h('span',null,'Upcoming reminder'),h('time',null,'1h')),h('p',null,'Spend 30 minutes on Rust ownership and borrowing.'))))
+        :h('div',{className:'empty'},'You are all caught up. A rare and suspicious state.')
+      );
+      const contextPanel=()=>h(React.Fragment,null,
+        heading('At a glance',h('label',{className:'context-toggle'},h('input',{type:'checkbox',checked:contextEnabled,onChange:e=>setContextEnabled(e.target.checked)}),'Auto context')),
+        h('div',{className:'quick-grid'},
+          ...[
+            ['clock','Time','Local clock','lavender',()=>say('Local time is shown in the header')],
+            ['wifi','Network',online?'Online':'Offline','blue',()=>setView('network')],
+            ['music','Media',playing?'Playing demo':'Paused','pink',()=>setView('media')]
+          ].map(([ico,title,sub,color,fn])=>h('button',{className:'quick-card',onClick:fn,key:title},h('span',{className:'qicon '+color},h(Icon,{name:ico,size:16})),h('strong',null,title),h('small',null,sub)))
+        ),
+        h('div',{className:'context-strip'},
+          h('span',{className:'context-chip '+(online?'':'off')},h('i',{className:'signal'}),online?'Browser online':'Browser offline'),
+          h('span',{className:'context-chip'},h('i',{className:'signal'}),connection&&connection.effectiveType?connection.effectiveType:'Network type unavailable'),
+          h('span',{className:'context-chip'},h('i',{className:'signal'}),navigator.getBattery?'Battery API available':'Battery API unavailable')
+        ),
+        h('div',{className:'context-detail'},contextEnabled?'Context awareness is enabled for this prototype. Browser APIs expose only limited system information; native Linux details belong in the Quickshell implementation.':'Automatic context is paused. Use the module buttons to open a panel directly.')
+      );
+      const networkPanel=()=>h(React.Fragment,null,
+        heading('Network status',h('button',{className:'small-action',onClick:()=>{setOnline(navigator.onLine);setConnection(navigator.connection || navigator.mozConnection || navigator.webkitConnection || null);say('Network status refreshed');}},'Refresh')),
+        h('div',{className:'list'},
+          h('div',{className:'list-item'},h('span',{className:'list-icon '+(online?'green':'pink')},h(Icon,{name:'wifi',size:15})),h('div',{className:'list-copy'},h('strong',null,'Connectivity'),h('small',null,online?'Browser reports an active network connection':'Browser reports no network connection')),h('span',{className:'pill'},online?'ONLINE':'OFFLINE')),
+          h('div',{className:'list-item'},h('span',{className:'list-icon blue'},h(Icon,{name:'arrow',size:15})),h('div',{className:'list-copy'},h('strong',null,'Connection type'),h('small',null,connection&&connection.effectiveType?connection.effectiveType:'Not exposed by this browser')),h('span',{className:'pill'},connection&&connection.downlink?connection.downlink+' Mb/s':'N/A')),
+          h('div',{className:'list-item'},h('span',{className:'list-icon lavender'},h(Icon,{name:'clock',size:15})),h('div',{className:'list-copy'},h('strong',null,'Network details'),h('small',null,'IP address, Wi-Fi signal and interface statistics are unavailable to ordinary web pages.')))
+        ),
+        h('div',{className:'context-detail'},'Prototype limitation: this panel uses browser-visible Network Information API data when available. The real Quickshell version can read Linux network state through native services.')
+      );
+      const panel=()=>({context:contextPanel,media:mediaPanel,clipboard:clipboardPanel,calendar:calendarPanel,notes:notesPanel,notifications:notificationsPanel,network:networkPanel}[view]||contextPanel)();
+      const titleMap={context:['System at a glance','Context-aware overview'],media:['Glasshouse','Aether · Late Night Systems'],clipboard:['Clipboard ready','3 recent items'],calendar:['Next event','14:30 · Review ctOS scope'],notes:['Quick note','Ideas for ctOS'],notifications:['Notifications','2 unread'],network:['Network status',online?'Online':'Offline']};
+      const compact=(title,sub,ico)=>h('div',{className:'island-top',onClick:()=>setExpanded(true),role:'button',tabIndex:0,onKeyDown:e=>{if(e.key==='Enter'||e.key===' ')setExpanded(true);},'aria-label':'Expand ctOS island'},
+        h('div',{className:'cover'},h(Icon,{name:ico||'disc',size:19})),
+        h('div',{className:'track'},h('div',{className:'track-title'},title),h('div',{className:'track-sub'},sub)),
+        h('div',{className:'compact-right '+(!playing&&view==='media'?'paused':'')},view==='media'?h('div',{className:'mini-bars'},h('i'),h('i'),h('i'),h('i')):h('span',{className:'compact-time'},'ctOS')),
+        btn('chevron','Expand island',()=>setExpanded(true))
+      );
+      return h('div',{className:'island-anchor-inner'},
+        h('section',{className:'island '+(expanded?'expanded':'compact')+' '+(!playing?'paused':''),'data-view':view, 'aria-label':'ctOS Dynamic Island'},
+          expanded?h(React.Fragment,null,
+            h('div',{className:'island-top'},
+              h('div',{className:'cover'},h(Icon,{name:'spark',size:19})),
+              h('div',{className:'track'},h('div',{className:'track-title'},'ctOS'),h('div',{className:'track-sub'},'A small surface for live activity')),
+              h('div',{className:'island-actions module-actions'},
+                ...[
+                  ['context','spark','Overview'],
+                  ['media','music','Media'],
+                  ['clipboard','clipboard','Clipboard'],
+                  ['calendar','calendar','Calendar'],
+                  ['notes','note','Notes'],
+                  ['notifications','bell','Notifications'],
+                  ['network','wifi','Network']
+                ].map(([id,ico,label])=>h('button',{
+                  key:id,
+                  className:'module-button '+(view===id?'selected':''),
+                  onClick:()=>setView(id),
+                  title:label,
+                  'aria-label':label,
+                  'aria-pressed':view===id
+                },h(Icon,{name:ico,size:15}))),
+                btn('close','Collapse island',()=>setExpanded(false))
+              )
+            ),
+            h('div',{className:'island-body'},
+              panel()
+            )
+          ):compact(...titleMap[view],({context:'spark',media:'disc',clipboard:'clipboard',calendar:'calendar',notes:'note',notifications:'bell',network:'wifi'})[view]||'spark')
+        )
+      );
+    }
+    createRoot(document.getElementById('island-anchor')).render(h(App));
+  </script>
+</body>
+</html>

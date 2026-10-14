@@ -1,0 +1,9 @@
+target
+result
+result-*
+.direnv/
+*.sqlite
+*.sqlite-journal
+*.db
+*.db-wal
+*.db-shm
