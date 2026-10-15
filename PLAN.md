@@ -219,7 +219,7 @@ dynamic-island-shell/
 | Wallpaper catalog | local FS + Wallhaven API + browser-handoff — see §4 |
 | Theming | palette from API/image, `matugen` to push to Qt/GTK/terminals |
 | Media | `mpris` crate |
-| Notifications | `ashpd` Notification portal — you become the daemon |
+| Notifications | `zbus` implementing `org.freedesktop.Notifications` on the session bus — you become the daemon, see §3.6 |
 | Clipboard | `wl-clipboard` watch on primary selection; paste-back via `wtype` |
 | Calendar | ICS via `icalendar`/`chrono`; optionally `khal` |
 | Todos | Own SQLite table; optional `taskwarrior` export |
@@ -229,6 +229,8 @@ dynamic-island-shell/
 | Meetings | `zwlr-screencast` node presence + window-title heuristics |
 | System tray | `org.kde.StatusNotifierWatcher` on the session bus — inherited from Ryoku, see §3.5 |
 | Idle / lock | logind `IdleHint`; lock screen is later scope |
+
+---
 
 ### 3.5 Replacing Ryoku, not merely coexisting with it
 
@@ -271,6 +273,61 @@ every other program on the bus.
 - §7's estimate in §10 does **not** cover porting Ryoku's session management.
   Treat "island done" and "Ryoku gone" as separate milestones; the former is
   Phases 0-6, the latter is additional work.
+### 3.6 Owning `org.freedesktop.Notifications`
+
+Notifications are a *bus-name* obligation, not a UI feature. Whoever holds the
+name owns the session's notification policy; an app that starts while nobody
+holds it typically queues or drops silently. This section records what it took
+to claim it, because two of the three facts below are wrong in the obvious
+direction and cost real time to find.
+
+**zbus's `request_name` steals.** `Connection::request_name` is documented as
+requesting "exclusive ownership without queueing (using `RequestNameFlags::
+ReplaceExisting` and `RequestNameFlags::DoNotQueue` flags) since that is the
+most typical case". `ReplaceExisting` means the name moves to the new owner if
+the old owner permits replacement — silently, with no warning from zbus.
+Calling it is how you quietly take over a live session. Always use
+`request_name_with_flags(name, RequestNameFlags::DoNotQueue.into())`, which
+adds the queue suppression without the replacement: a taken name is an error
+you can log rather than a name you just took. Verified against the live bus —
+with Ryoku holding `org.freedesktop.Notifications`, isled logs `could not
+claim ...: name already taken on the bus`, keeps serving IPC, and the owner is
+unchanged.
+
+**Owning the name is the only way to see notifications.** The spec has no
+broadcast of `Notify` calls, so a client cannot observe other apps'
+notifications. There is no passive mode: either you hold the name and receive
+everything, or you see nothing. This is why `features.notifications` in the
+snapshot means "we hold the name", not "notifications are implemented" — the UI
+needs to tell the difference so it can explain an empty panel honestly instead
+of implying nothing is happening.
+
+**Promotion happens once, at ingest.** Hints arrive as `a{sv}`, whose values are
+structurally untyped; each client layer renames things. Promote the handful the
+UI actually reads — `urgency`, `category`, `desktop-entry` (with or without a
+`.desktop` suffix), `transient` — into first-class fields at ingest and keep the
+raw map alongside, rather than re-parsing the map in the view layer. Also note
+`desktop-entry` may or may not carry the suffix; strip it once.
+
+Array-valued hints are dropped: zvariant's `downcast_ref` has no container
+support, and the hints this shell reads are all scalars, strings or booleans.
+The raw keys are still kept, which is enough to know `image-data` was present —
+pixel decoding is deliberately not done here.
+
+**Actions and replaces.** Spec `actions` is one flat alternating array of
+`(action_key, text)` pairs, so a malformed odd-length array must drop the
+trailing element rather than panic. `Notify` takes `replaces_id`; a replace of a
+still-live id reuses that id in place, while a replace of an expired or unknown
+id is a new notification with a fresh id. Expiry is the daemon's job — a
+background sweep removes expired entries and emits `NotificationClosed`, since
+otherwise a timeout of 0 (the common case, meaning "never") means the store
+grows forever.
+
+The tray is a separate, still-outstanding obligation: §3.5 lists
+`org.kde.StatusNotifierWatcher` alongside notifications, and only the latter is
+done. Some apps change behaviour based on whether a tray host exists, so the
+gap is visible even though it is quieter.
+
 
 ---
 
@@ -762,6 +819,10 @@ meets its criterion.
 ### Phase 2 — Live activity core (2-3 days)
 - Priority queue + dwell rules + slide transition.
 - Notification daemon replacement; notification arrives as a pill activity.
+  Shipped: `org.freedesktop.Notifications` via zbus with opt-in claiming (§3.6),
+  plus the notifications panel (view 3) reading live events. Still owed: the
+  pill-activity path, where an arriving notification grows the compact pill,
+  and `org.kde.StatusNotifierWatcher` (§3.5).
 - MPRIS media → pill activity, full media panel.
 - Basic calendar of *events* (read-only) — no editing yet.
 

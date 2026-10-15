@@ -14,7 +14,11 @@ QtObject {
 
     property bool connected: socket.connected
     property var snapshot: ({})
+
     property var stats: ({})
+
+    property var notifications: []
+    property int unreadCount: 0
     property int tickCount: 0
     property string lastTopic: ""
     property string lastError: ""
@@ -28,6 +32,46 @@ QtObject {
     signal viewStepped(int delta)
     signal toggleRequested()
     signal focusRequested()
+
+    function onNotificationAdded(notification) {
+        if (notification === undefined || notification === null)
+            return;
+        let next = [];
+        for (const existing of notifications) {
+            if (existing.id !== notification.id)
+                next.push(existing);
+        }
+        next.push(notification);
+        notifications = next;
+        unreadCount += 1;
+    }
+
+    function onNotificationRemoved(id) {
+        if (id === undefined)
+            return;
+        notifications = notifications.filter((item) => item.id !== id);
+    }
+
+    function clearUnread() {
+        unreadCount = 0;
+    }
+
+    function dismissNotification(id) {
+        call("notifications.dismiss", {
+            "id": id
+        });
+    }
+
+    function clearNotifications() {
+        call("notifications.clear", {});
+    }
+
+    function invokeAction(id, key) {
+        call("notifications.action", {
+            "id": id,
+            "key": key
+        });
+    }
 
     function call(name, args) {
         var message = {
@@ -70,12 +114,20 @@ QtObject {
 
         if (message.t === "state") {
             snapshot = message.data;
+            if (message.data.notifications !== undefined)
+                notifications = message.data.notifications;
         } else if (message.t === "event") {
             lastTopic = message.topic;
             if (message.topic === "system.stats") {
                 stats = message.data;
                 tickCount++;
             }
+            else if (message.topic === "notifications.added")
+                onNotificationAdded(message.data);
+            else if (message.topic === "notifications.removed")
+                onNotificationRemoved(message.data.id);
+            else if (message.topic === "notifications.cleared")
+                notifications = [];
             else if (message.topic === "view.set")
                 viewRequested(message.data.index | 0);
             else if (message.topic === "view.step")

@@ -16,25 +16,48 @@ fn resolve_socket_path(env: impl Fn(&str) -> Option<std::ffi::OsString>) -> Path
     runtime.join("isled").join("isled.sock")
 }
 
+pub const CLAIM_NOTIFICATIONS_ENV: &str = "ISLED_CLAIM_NOTIFICATIONS";
+
 pub enum Args {
-    Serve,
+    Serve(bool),
     Call { name: String, raw: String },
-    SocketPath,
+    SocketPath(bool),
     Help,
     Unknown(String),
 }
 
+pub fn env_wants_notifications(key: &str) -> bool {
+    matches!(std::env::var(key), Ok(value) if matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    ))
+}
+
 pub fn parse_args<I: IntoIterator<Item = String>>(args: I) -> Args {
-    let mut args = args.into_iter();
+    let mut args = args.into_iter().peekable();
+    let mut claim = env_wants_notifications(CLAIM_NOTIFICATIONS_ENV);
+    while let Some(flag) = args.peek().map(|s| s.as_str()) {
+        match flag {
+            "--claim-notifications" => {
+                claim = true;
+                args.next();
+            }
+            "--no-claim-notifications" => {
+                claim = false;
+                args.next();
+            }
+            _ => break,
+        }
+    }
     match args.next().as_deref() {
         Some("call") => {
             let name = args.next().unwrap_or_default();
             let raw = args.next().unwrap_or_default();
             Args::Call { name, raw }
         }
-        Some("socket-path") => Args::SocketPath,
+        Some("socket-path") => Args::SocketPath(claim),
         Some("--help" | "-h") => Args::Help,
-        None => Args::Serve,
+        None => Args::Serve(claim),
         Some(other) => Args::Unknown(other.to_owned()),
     }
 }
@@ -106,10 +129,37 @@ mod tests {
     #[test]
     fn bare_invocation_serves_and_help_recognises_flags() {
         let args = |v: &[&str]| parse_args(v.iter().map(|s| (*s).to_owned()));
-        assert!(matches!(args(&[]), Args::Serve));
+        assert!(matches!(args(&[]), Args::Serve(false)));
         assert!(matches!(args(&["--help"]), Args::Help));
         assert!(matches!(args(&["-h"]), Args::Help));
         assert!(matches!(args(&["nonsense"]), Args::Unknown(ref s) if s == "nonsense"));
+    }
+
+    #[test]
+    fn claiming_the_bus_name_is_opt_in_by_flag() {
+        let args = |v: &[&str]| parse_args(v.iter().map(|s| (*s).to_owned()));
+        assert!(matches!(
+            args(&["--claim-notifications"]),
+            Args::Serve(true)
+        ));
+        assert!(matches!(
+            args(&["--no-claim-notifications"]),
+            Args::Serve(false)
+        ));
+        assert!(matches!(args(&[]), Args::Serve(false)));
+    }
+
+    #[test]
+    fn the_flag_is_stripped_before_finding_the_subcommand() {
+        let args = |v: &[&str]| parse_args(v.iter().map(|s| (*s).to_owned()));
+        assert!(matches!(
+            args(&["--claim-notifications", "socket-path"]),
+            Args::SocketPath(true)
+        ));
+        assert!(matches!(
+            args(&["call", "ping"]),
+            Args::Call { ref name, .. } if name == "ping"
+        ));
     }
 
     #[test]

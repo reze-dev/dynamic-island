@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod notify;
 mod paths;
 mod server;
 mod stats;
@@ -28,19 +29,26 @@ async fn main() -> ExitCode {
         .init();
 
     match parse_args(std::env::args().skip(1)) {
-        Args::Serve => match tokio::spawn(server::Server::new().serve()).await {
-            Ok(Ok(())) => ExitCode::SUCCESS,
-            Ok(Err(err)) => {
-                tracing::error!(%err, "server failed");
-                ExitCode::FAILURE
+        Args::Serve(claim_notifications) => {
+            match tokio::spawn(server::Server::new(claim_notifications).serve()).await {
+                Ok(Ok(())) => ExitCode::SUCCESS,
+                Ok(Err(err)) => {
+                    tracing::error!(%err, "server failed");
+                    ExitCode::FAILURE
+                }
+                Err(err) => {
+                    tracing::error!(%err, "server task panicked");
+                    ExitCode::FAILURE
+                }
             }
-            Err(err) => {
-                tracing::error!(%err, "server task panicked");
-                ExitCode::FAILURE
-            }
-        },
+        }
         Args::Call { name, raw } => call(&name, &raw).await,
-        Args::SocketPath => {
+        Args::SocketPath(claim_notifications) => {
+            if claim_notifications {
+                // the socket path does not depend on the bus name, but accepting the flag here
+                // keeps `isled --claim-notifications socket-path` from failing as "unknown"
+            }
+
             println!("{}", socket_path().display());
             ExitCode::SUCCESS
         }

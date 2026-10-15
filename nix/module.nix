@@ -72,6 +72,26 @@ in {
       '';
     };
 
+    claimNotifications = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Let isled own org.freedesktop.Notifications on the session bus.
+
+        Off by default, and do not turn it on while another notification
+        daemon is running. isled asks for the name with DoNotQueue only,
+        deliberately omitting zbus's default ReplaceExisting, so it refuses to
+        take the name rather than silently stealing it from whatever owns it.
+        That is the transition safety property: with another daemon alive,
+        isled logs "could not claim ... name already taken on the bus" and
+        keeps running, and the existing daemon keeps every notification.
+
+        Once this shell is replacing that daemon, the name is free and isled
+        takes it. Check before flipping: if isled reports features.notifications
+        = false, it did not get the name.
+      '';
+    };
+
     sessionTargets = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
@@ -121,7 +141,10 @@ in {
       };
       Service = {
         Type = "simple";
-        ExecStart = lib.getExe cfg.package;
+        ExecStart = lib.concatStringsSep " " (
+          [(lib.getExe cfg.package)]
+          ++ lib.optionals cfg.claimNotifications ["--claim-notifications"]
+        );
         Restart = "on-failure";
         RestartSec = 2;
         RuntimeDirectory = "isled";

@@ -30,6 +30,8 @@ pub enum ServerMessage {
         ok: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         error: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        data: Option<serde_json::Value>,
     },
 }
 
@@ -39,6 +41,16 @@ impl ServerMessage {
             id,
             ok: true,
             error: None,
+            data: None,
+        }
+    }
+
+    pub fn reply_with(id: u64, data: impl Into<serde_json::Value>) -> Self {
+        Self::Reply {
+            id,
+            ok: true,
+            error: None,
+            data: Some(data.into()),
         }
     }
 
@@ -47,6 +59,7 @@ impl ServerMessage {
             id,
             ok: false,
             error: Some(error.into()),
+            data: None,
         }
     }
 
