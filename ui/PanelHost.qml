@@ -23,6 +23,12 @@ Item {
         snapshot: host.snapshot
     }
 
+    MediaPanel {
+        anchors.fill: parent
+        visible: host.view === 1
+        enabled: host.view === 1
+    }
+
     NotificationsPanel {
         anchors.fill: parent
         visible: host.view === 2

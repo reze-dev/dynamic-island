@@ -824,8 +824,14 @@ meets its criterion.
   Shipped: `org.freedesktop.Notifications` via zbus with opt-in claiming (§3.6),
   plus the notifications panel (view 3) reading live events. Still owed: the
   pill-activity path, where an arriving notification grows the compact pill,
-  and `org.kde.StatusNotifierWatcher` (§3.5).
+  and `org.kde.StatusNotifierWatcher` (§3.5). Both of those need the bus name,
+  which is still held by Ryoku, so view 3 cannot receive a real notification
+  until Ryoku goes — see §3.6.
 - MPRIS media → pill activity, full media panel.
+  Shipped: the media panel (view 1) on `Quickshell.Services.Mpris`, which is
+  already in the quickshell the session runs, so this needs no Rust and no
+  protocol of ours. The pill half is still owed. Since MPRIS is a consumer and
+  Ryoku holds nothing here, this one is unblocked.
 - Basic calendar of *events* (read-only) — no editing yet.
 
 **Exit:** music + notifications both drive the pill correctly, including

@@ -1,3 +1,4 @@
 module panels
 ContextPanel 1.0 ContextPanel.qml
+MediaPanel 1.0 MediaPanel.qml
 NotificationsPanel 1.0 NotificationsPanel.qml
