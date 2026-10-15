@@ -204,6 +204,8 @@ dynamic-island-shell/
     panels/             one file per panel
     components/         Pill, Card, Icon, SegmentedControl, ...
   nix/                  flake, module
+  systemd/              dev user units, same names the module declares (§9.3)
+  justfile              the dev loop; `just` recipes wrap the commands below
 ```
 
 ### 3.4 Backend selection per feature
@@ -960,6 +962,25 @@ systemd.user.services.isled = {
   Install = { WantedBy = [ "isle.target" ]; };
 };
 ```
+
+**Dev units are the same units.** Before the module is enabled — which it
+cannot be yet, because it would double-claim the notification bus name and the
+tray against Ryoku (§3.5) — the two units live in `systemd/isled.service` and
+`systemd/quickshell.service` and are installed with `just start`. They use the
+same unit *names* the module declares, pointed at the dev binary by `%h`, so
+enabling the module later is a file swap rather than a rename. That matters
+because a transient unit created by `systemd-run` cannot be enabled and blocks
+the file-backed unit of the same name: the first `just start` has to retire the
+old transient unit, which it does automatically.
+
+**Keep them a real systemd user unit rather than a child of a terminal.** The
+dev loop wants fast iteration, and the temptation is `isled &` from a shell.
+Three things are lost. A shell that dies with its terminal is not a shell.
+Nothing restarts it on crash. And a `kill -9` leaves the socket file behind,
+which is the failure the SIGTERM test in §3.2 exists to prevent — the next start
+then fails with "address already in use" for no visible reason. The
+`deploy`/`deploy-ui` recipes restart the unit after building, so iteration is one
+command and none of this is lost.
 
 This is why `nix/module.nix` does not use `programs.quickshell.systemd` at all —
 it writes its own `quickshell.service` so that ordering against `isled.service`

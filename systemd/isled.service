@@ -1,0 +1,22 @@
+[Unit]
+Description=Dynamic Island Shell session daemon
+After=graphical-session-pre.target
+Wants=graphical-session-pre.target
+
+[Service]
+Type=simple
+ExecStart=%h/Projects/dynamic-island/core/target/debug/isled
+Restart=on-failure
+RestartSec=2
+
+RuntimeDirectory=isled
+
+Environment=NIXOS_OZONE_WL=1
+
+# The compositor adapter and the notification bus both read these. They are
+# already in the systemd user manager, so ImportEnvironment is enough; if the
+# compositor reports Unknown this is the first thing to check.
+ImportEnvironment=WAYLAND_DISPLAY XDG_RUNTIME_DIR XDG_SESSION_TYPE NIRI_SOCKET HYPRLAND_INSTANCE_SIGNATURE DBUS_SESSION_BUS_ADDRESS
+
+[Install]
+WantedBy=graphical-session.target

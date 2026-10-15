@@ -13,10 +13,16 @@ repo := justfile_directory()
 bin := repo / "core/target/debug/isled"
 ui := repo / "ui"
 
-# Service names. These are transient units started by `just start`; the Home
-# Manager module uses `isled` and `quickshell` instead.
+# Service names, taken from the units in ./systemd so that this file and the
+# eventual Home Manager module name them the same thing. The module defines
+# systemd.user.services.isled and .quickshell; these unit files are the same
+# names pointed at the dev binary. When the module is enabled it overwrites
+# these files, so `just restart` keeps working across the switch.
 daemon := "isled"
-shell := "quickshell-isle"
+shell := "quickshell"
+
+# Where the user units live.
+units := env("XDG_CONFIG_HOME", env("HOME") + "/.config") / "systemd/user"
 
 export ISLED_SOCKET := env_var_or_default("ISLED_SOCKET", env("XDG_RUNTIME_DIR") + "/isled/isled.sock")
 
@@ -87,25 +93,78 @@ check-all: check fmt-nix binary-is-fresh
 
 # ---------------------------------------------------------------- services
 
-# Starts both units as transient systemd user services. They outlive this
-# recipe and survive a reboot only if you re-run `just start`.
-start:
+# Copies the unit files into place and starts them. Real units rather than
+# transient ones, so they survive this terminal closing and get restarted on
+# crash; systemd also unlinks the socket reliably on SIGTERM, which is what
+# keeps the next start from failing with "address already in use".
+install-units:
+    mkdir -p {{units}}
+    cp {{repo}}/systemd/{{daemon}}.service {{units}}/
+    cp {{repo}}/systemd/{{shell}}.service {{units}}/
+    systemctl --user daemon-reload
+    @echo "installed {{units}}/{{daemon}}.service"
+    @echo "installed {{units}}/{{shell}}.service"
+
+# `--now` also enables them at graphical-session.target, so they come back
+# after a reboot. Without it they only run until next login.
+# Retires the transient units from earlier experiments. A transient unit
+# cannot be enabled and blocks the file-backed one of the same name, so this
+# has to run once before the switchover sticks.
+retire-transient:
     #!/usr/bin/env bash
     set -euo pipefail
-    systemctl --user stop {{daemon}} {{shell}} 2>/dev/null || true
-    systemctl --user reset-failed {{daemon}} {{shell}} 2>/dev/null || true
-    systemd-run --user --unit={{daemon}} --collect \
-        --property=Restart=on-failure "{{bin}}" >/dev/null
-    systemd-run --user --unit={{shell}} --collect \
-        --property=Restart=on-failure \
-        --setenv=WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" \
-        --setenv=XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}" \
-        "${QUICKSHELL:-/run/current-system/sw/bin/quickshell}" -p {{ui}} >/dev/null
-    echo "started {{daemon}} and {{shell}}"
+    for unit in {{daemon}} quickshell-isle; do
+        if systemctl --user show "$unit" -p FragmentPath --value 2>/dev/null \
+            | grep -q transient; then
+            systemctl --user stop "$unit" 2>/dev/null || true
+            echo "retired the transient $unit.service"
+        fi
+    done
+    systemctl --user reset-failed 2>/dev/null || true
+
+start: install-units retire-transient
+    systemctl --user enable --now {{daemon}} {{shell}}
+    @echo "started {{daemon}} and {{shell}}"
+
+# Stops and disables without removing the unit files.
+down:
+    systemctl --user disable --now {{daemon}} {{shell}} 2>/dev/null || true
 
 stop:
     systemctl --user stop {{daemon}} {{shell}} 2>/dev/null || true
     systemctl --user reset-failed {{daemon}} {{shell}} 2>/dev/null || true
+
+# Removes the unit files entirely, returning to no daemon at all.
+uninstall-units:
+    rm -f {{units}}/{{daemon}}.service {{units}}/{{shell}}.service
+    systemctl --user daemon-reload
+    @echo "removed the unit files"
+
+# Runs isled against the live session bus long enough to prove it will not
+# steal the name, then leaves. The dev daemon stays in its safe default; this
+# is the explicit check that the claim path is still correct.
+claim-check:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    before=$(gdbus call --session --dest org.freedesktop.DBus \
+        --object-path /org/freedesktop/DBus \
+        --method org.freedesktop.DBus.GetNameOwner \
+        org.freedesktop.Notifications 2>&1)
+    "{{bin}}" --claim-notifications >/tmp/isled-claim-check.log 2>&1 &
+    pid=$!
+    trap "kill $pid 2>/dev/null" EXIT
+    sleep 2
+    after=$(gdbus call --session --dest org.freedesktop.DBus \
+        --object-path /org/freedesktop/DBus \
+        --method org.freedesktop.DBus.GetNameOwner \
+        org.freedesktop.Notifications 2>&1)
+    if [ "$before" = "$after" ]; then
+        echo "PASS  the notification bus name stayed with $after"
+    else
+        echo "FAIL  the name moved: $before -> $after"
+        exit 1
+    fi
+    grep -o 'name already taken on the bus' /tmp/isled-claim-check.log | sed 's/^/      /' | head -1
 
 # Build first, then restart, so the running daemon is always the built one.
 deploy: build
@@ -116,6 +175,10 @@ deploy: build
 deploy-ui: build
     systemctl --user restart {{shell}}
     @echo "restarted {{shell}}"
+
+# Reload the unit files if they changed, without restarting.
+reload:
+    systemctl --user daemon-reload
 
 status:
     @systemctl --user is-active {{daemon}} {{shell}} 2>/dev/null || true
