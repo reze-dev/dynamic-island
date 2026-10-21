@@ -303,13 +303,20 @@ events:
 ui-check:
     #!/usr/bin/env bash
     set -euo pipefail
+    # The shell on its own, and then the preview rig, which puts the island
+    # into every one of its appearances. A component that only exists in the
+    # peek view is never created by the first of these, and a missing import
+    # in it is a runtime error rather than a load error.
     out=$(timeout 20 quickshell -p {{ui}} 2>&1 || true)
+    preview=$(cd {{ui}} && QT_QPA_PLATFORM=offscreen timeout 40 quickshell -p preview.qml 2>&1 || true)
     # The service warnings are environmental: a machine with no bluetooth
     # daemon, no UPower or no notification bus is not a broken shell.
     # The trailing `|| true` matters: with `set -e` and `pipefail`, a grep
     # that matches nothing would otherwise fail the whole recipe.
-    bad=$(echo "$out" | grep -iE 'error|cannot assign|unavailable|binding loop|ReferenceError' \
-        | grep -avE 'bluez|UPower|portal|QLocalSocket|ServerNotFound|qt.qpa.services' || true)
+    bad=$(echo "$out$preview" \
+        | grep -iE 'error|cannot assign|unavailable|binding loop|ReferenceError|TypeError' \
+        | grep -avE 'bluez|UPower|portal|QLocalSocket|ServerNotFound|qt.qpa.services|No PanelWindow backend' \
+        || true)
     if [ -n "$bad" ]; then
         echo "$bad" | head -8
         exit 1

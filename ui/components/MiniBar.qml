@@ -1,4 +1,5 @@
 import QtQuick
+import ".."
 
 // One line of a bar graph, used by the peek view to show how loaded the
 // machine is.

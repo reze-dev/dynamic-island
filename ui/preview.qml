@@ -20,6 +20,12 @@ ShellRoot {
     id: root
 
     property int index: 0
+
+    /// The scenario being shown, clamped. The index walks past the end of
+    /// the list when the run is over, and the bindings below are evaluated
+    /// anyway.
+    readonly property var scenario: root.scenarios[Math.min(root.index, root.scenarios.length - 1)]
+
     readonly property string output: Quickshell.env("ISLED_PREVIEW_DIR")
         ? Quickshell.env("ISLED_PREVIEW_DIR")
         : "/tmp/isle-preview"
@@ -188,11 +194,11 @@ ShellRoot {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: 24
-            mode: root.scenarios[root.index].mode
-            hovered: root.scenarios[root.index].hovered
-            ambient: root.scenarios[root.index].ambient
-            trigger: root.scenarios[root.index].trigger
-            view: root.scenarios[root.index].view
+            mode: root.scenario.mode
+            hovered: root.scenario.hovered
+            ambient: root.scenario.ambient
+            trigger: root.scenario.trigger
+            view: root.scenario.view
             bridge: root.bridge
         }
     }
@@ -221,7 +227,7 @@ ShellRoot {
             Qt.callLater(Qt.quit);
             return;
         }
-        var scenario = root.scenarios[root.index];
+        var scenario = root.scenario;
         island.grabToImage(function (result) {
             result.saveToFile(root.output + "/" + scenario.name + ".png");
             root.index = root.index + 1;
