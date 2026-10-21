@@ -21,6 +21,12 @@
       cfg.awwwFormat
     ]
   );
+
+  # The compositor has to be up before the island starts, or the island
+  # finds no display to draw on.
+  compositorUnits = lib.optionals (cfg.compositorService != null) [
+    cfg.compositorService
+  ];
 in {
   options.programs.isle = {
     enable = lib.mkEnableOption "the Dynamic Island Shell";
@@ -165,12 +171,6 @@ in {
         WantedBy = cfg.sessionTargets;
       };
     };
-
-    # The compositor has to be up before the island starts, or the island
-    # finds no display to draw on.
-    compositorUnits = lib.optionals (cfg.compositorService != null) [
-      cfg.compositorService
-    ];
 
     systemd.user.services.isled = {
       Unit = {
