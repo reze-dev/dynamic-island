@@ -414,7 +414,45 @@ Also worth skimming: `end-4/dots-hyprland`, `caelestia-dots`, `noctalia`.
 now. Read `~/.config/niri/` and the Ryoku NixOS modules before reinventing
 session bootstrap, since we are replacing it.
 
-## 7. What to do first, in this order
+## 7. How it is installed
+
+The shell is a Home Manager module in this repo, and the target system
+flake imports it:
+
+```nix
+# in the system flake
+isle.url = "github:reze-dev/dynamic-island";
+
+# in a home module
+imports = [ inputs.isle.homeModules.default ];
+programs.isle = {
+  enable = true;
+  claimNotifications = true;            # the bus name is free now
+  sessionTargets = [ "graphical-session.target" ];
+  compositorService = "niri.service";  # the island needs WAYLAND_DISPLAY
+};
+```
+
+`nix/keybinds.nix` produces the compositor binds; the system flake merges
+them into niri's own.
+
+Two things about the targets are worth knowing, because both were wrong
+before they were right:
+
+- **`graphical-session.target` is the target that exists.** The
+  compositor-specific targets some compositors ship do not exist on
+  NixOS, and a unit whose `WantedBy` names a target that does not exist
+  is never started at all — not started *later*, never.
+- **The island has to wait for the compositor.** It needs
+  `WAYLAND_DISPLAY`, and the compositor is what puts it there. Started at
+  the same time as the session, the island can win the race and find no
+  display. `compositorService` names the compositor's unit so the island
+  waits for it.
+
+The daemon is also put on the user's `PATH`, because the keybinds run
+`isled call ...` by name and a service's binary is not on anyone's path.
+
+## 8. What to do first, in this order
 
 Done:
 
@@ -439,22 +477,17 @@ Done:
 
 Still open, in this order:
 
-11. **Commit the work.** Everything above is uncommitted, and a flake build
-    of a local path only sees committed files (§4.7, trap 7). Nothing has
-    been committed on purpose — that is the user's call.
-12. **Wire the shell into the system flake.** `/home/reze/Michi` has no
-    reference to `isle` at all. It needs the flake as a `path:` input, the
-    `programs.isle` module enabled, and the keybinds merged in:
-
-    ```nix
-    # in the niri module
-    wayland.windowManager.niri.settings.binds =
-      lib.mkMerge [ inputs.isle.lib.keybinds.niriBinds ( ...your own... ) ];
-    ```
-
-    `nix/keybinds.nix` already produces the right shape for both compositors.
-    **This is the last thing standing between the shell and being usable from
-    the keyboard.**
+11. ~~**Wire the shell into the system flake.**~~ Done: `/home/reze/Michi`
+    imports the island, the module is enabled, the keybinds are merged into
+    niri's, mako is gone and the island owns the notification bus name.
+    **It still needs `nixos-rebuild switch`, and then a logout or a
+    restart of the session** — the island's target hangs off the graphical
+    session, so it starts with the session rather than with a rebuild.
+12. **The system tray.** `org.kde.StatusNotifierWatcher` has no owner on
+    this machine now. The old shell was the last one, so tray icons have
+    nowhere to appear. The plan lists it as an obligation the island
+    inherited (§3.5), and it is the one thing Ryoku did that the island
+    does not yet.
 13. **Look at the island.** There are three ways, in increasing order of
     how much they tell you:
 
@@ -484,7 +517,7 @@ Still open, in this order:
     `compositor=niri` from a systemd unit rather than `unknown`, the unit
     wiring is unproven.
 
-## 8. Open decisions — ask before the relevant phase
+## 9. Open decisions — ask before the relevant phase
 
 1. Adopt a pre-existing default-namespace awww daemon, or always
    `--namespace isle`? (before Phase 3)
@@ -504,7 +537,7 @@ Still open, in this order:
 9. **Video wallpapers at all?** awww cannot do it; mpvpaper is a separate
    daemon. Decides whether browser handoff ships.
 
-## 9. Honest effort estimate
+## 10. Honest effort estimate
 
 Phases 0–3 (~2 weeks) already yield a genuinely usable island, and most of
 that is now built. Phases 4–6 are the remote wallpaper sources, the fuller
