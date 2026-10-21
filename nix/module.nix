@@ -96,9 +96,17 @@ in {
       type = lib.types.listOf lib.types.str;
       default = [
         "niri-session.target"
-        "hyprland-session.target"
       ];
-      description = "Session targets the island starts with.";
+      defaultText = lib.literalExpression "[ \"niri-session.target\" ]";
+      description = ''
+        Session targets the island starts with.
+
+        One target per compositor, and the list is not a fallback list: a
+        unit whose WantedBy names a target that does not exist is simply
+        never started. Listing a compositor that is not installed therefore
+        stops the island from starting at all, rather than doing nothing
+        useful. Add the ones that are actually installed.
+      '';
     };
 
     forwardedEnvironment = lib.mkOption {

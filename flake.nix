@@ -119,5 +119,10 @@
     lib = {
       keybinds = import ./nix/keybinds.nix { lib = nixpkgs.lib; };
     };
+
+    # The Home Manager module, for the system flake to import. It installs
+    # the UI, declares the daemon and the wallpaper engine as user services,
+    # and puts them all behind one target.
+    homeModules.default = import ./nix/module.nix;
   };
 }
