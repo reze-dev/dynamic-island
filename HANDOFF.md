@@ -459,8 +459,12 @@ Still open, in this order:
     how much they tell you:
 
     - `just preview` — photographs the island in each of its appearances
-      without a compositor, a daemon or a screenshot tool. It found two
-      layout faults the tests could not.
+      without a compositor, a daemon or a screenshot tool.
+    - `just preview-live` — the same, but against a seeded daemon: real
+      wallpapers, a real calendar, real notes, todos and notifications, so
+      every panel is photographed with something in it. **An empty panel is a
+      forgiving thing — it hides every layout fault there is.** This is the
+      one that found the nine visual bugs fixed in the last commit.
     - `just demo-anim` — renders the island headless, photographs it *while
       the `Behavior` animations are running*, and assembles the frames into
       `/tmp/isle-demo/island.gif`. The morph is the one thing a screenshot
