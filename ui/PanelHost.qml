@@ -1,93 +1,79 @@
 import QtQuick
 import "panels"
 
+// The panel router.
+//
+// One view is visible at a time. Every panel is instantiated from the start
+// so that it can keep its own state — a half-written todo, a note being
+// edited — but only the visible one draws anything heavy.
 Item {
     id: host
 
     property int view: 0
-    property var stats: ({})
-    property var snapshot: ({})
+    property var bridge: null
 
-    readonly property var isled: (host.parent && host.parent.isled) ? host.parent.isled : null
-    readonly property var notifications: host.isled ? host.isled.notifications : []
-    readonly property int unreadCount: host.isled ? host.isled.unreadCount : 0
-    readonly property bool holdingBusName: (host.isled && host.isled.snapshot.features)
-        ? (host.isled.snapshot.features.notifications === true)
-        : false
+    readonly property var isled: bridge
 
     ContextPanel {
         anchors.fill: parent
         visible: host.view === 0
         enabled: host.view === 0
-        stats: host.stats
-        snapshot: host.snapshot
+        bridge: host.bridge
     }
 
     MediaPanel {
         anchors.fill: parent
         visible: host.view === 1
         enabled: host.view === 1
+        bridge: host.bridge
     }
 
     NotificationsPanel {
         anchors.fill: parent
         visible: host.view === 2
         enabled: host.view === 2
-        notifications: host.notifications
-        unreadCount: host.unreadCount
-        holdingBusName: host.holdingBusName
-
-        onDismissed: (id) => {
-            if (host.isled) {
-                host.isled.dismissNotification(id);
-                host.isled.clearUnread();
-            }
-        }
-        onClearedAll: {
-            if (host.isled) {
-                host.isled.clearNotifications();
-                host.isled.clearUnread();
-            }
-        }
-        onActionInvoked: function(id, key) {
-            if (host.isled)
-                host.isled.invokeAction(id, key);
-        }
+        bridge: host.bridge
     }
 
-    Column {
+    ClipboardPanel {
         anchors.fill: parent
-        anchors.margins: Theme.spacingLoose
-        spacing: Theme.spacing
-        visible: host.view !== 0 && host.view !== 2
+        visible: host.view === 3
+        enabled: host.view === 3
+        bridge: host.bridge
+    }
 
-        Text {
-            text: PanelCatalog.names[host.view] ?? "?"
-            color: Theme.text
-            font.family: "Inter"
-            font.pixelSize: 24
-            font.weight: Font.Bold
-        }
+    CalendarPanel {
+        anchors.fill: parent
+        visible: host.view === 4
+        enabled: host.view === 4
+        bridge: host.bridge
+    }
 
-        Text {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.textDim
-            font.family: "Inter"
-            font.pixelSize: 13
-            text: PanelCatalog.subtitles[host.view] ?? ""
-        }
+    TodosPanel {
+        anchors.fill: parent
+        visible: host.view === 5
+        enabled: host.view === 5
+        bridge: host.bridge
+    }
 
-        Text {
-            color: Theme.textDim
-            font.family: "Inter"
-            font.pixelSize: 12
-            text: "Mod+Ctrl+" + (host.view + 1) + " · placeholder"
-        }
+    NotesPanel {
+        anchors.fill: parent
+        visible: host.view === 6
+        enabled: host.view === 6
+        bridge: host.bridge
+    }
 
-        Item {
-            width: parent.width
-            height: 1
-        }
+    NetworkPanel {
+        anchors.fill: parent
+        visible: host.view === 7
+        enabled: host.view === 7
+        bridge: host.bridge
+    }
+
+    ThemePanel {
+        anchors.fill: parent
+        visible: host.view === 8
+        enabled: host.view === 8
+        bridge: host.bridge
     }
 }

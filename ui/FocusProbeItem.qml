@@ -21,7 +21,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: Theme.surfaceRaised
+        color: Theme.card
         radius: 12
         border.width: 2
         border.color: probe.hasFocus ? Theme.accent : Theme.border

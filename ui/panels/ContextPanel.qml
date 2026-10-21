@@ -1,147 +1,281 @@
 import QtQuick
 import ".."
+import "../components"
 
+// The home panel.
+//
+// "Only important events and context happening in the machine" — so this is
+// not a system monitor. It is a short list of what is going on, with the
+// vitals underneath it as context rather than as the subject.
 Item {
     id: panel
 
-    property var stats: ({})
-    property var snapshot: ({})
+    property var bridge: null
 
-    readonly property var session: snapshot.session ?? {}
+    readonly property var stats: bridge && bridge.stats ? bridge.stats : null
+    readonly property var session: bridge && bridge.snapshot ? bridge.snapshot.session : null
+    readonly property var ambient: bridge && bridge.activity ? bridge.activity : null
+    readonly property var recent: bridge && bridge.activities ? bridge.activities : []
+    readonly property var todo: bridge && bridge.todos && bridge.todos.length > 0 ? bridge.todos[0] : null
+    readonly property var timer: bridge && bridge.timer ? bridge.timer : null
+
+    /// The things worth showing: the persistent condition, and anything that
+    /// happened in the last few minutes that has not faded out.
+    readonly property var highlights: {
+        var list = [];
+        if (ambient)
+            list.push(ambient);
+        for (var i = 0; i < recent.length; i++) {
+            if (list.length >= 4)
+                break;
+            var item = recent[i];
+            if (!item)
+                continue;
+            if (item.sticky)
+                continue;
+            list.push(item);
+        }
+        return list;
+    }
 
     Column {
+        id: column
         anchors.fill: parent
-        anchors.margins: Theme.spacingLoose
+        anchors.margins: Theme.spacing
+        anchors.bottomMargin: Theme.spacingTight
         spacing: Theme.spacing
 
-        Text {
-            text: "At a glance"
-            color: Theme.text
-            font.family: "Inter"
-            font.pixelSize: 24
-            font.weight: Font.Bold
-        }
-
-        Text {
-            text: (session.compositor ?? "unknown") + " · wayland " + (session.wayland_display ?? "?")
-            color: Theme.textDim
-            font.family: "Inter"
-            font.pixelSize: 13
-        }
+        // ---- vitals ----
 
         Grid {
-            columns: 3
+            width: parent.width
+            columns: 4
             columnSpacing: Theme.spacing
             rowSpacing: Theme.spacing
-            width: parent.width
 
-            Repeater {
-                model: [
-                    {
-                        title: "Cpu",
-                        value: stats.cpu_percent !== undefined ? stats.cpu_percent.toFixed(1) + "%" : "—"
-                    },
-                    {
-                        title: "Memory",
-                        value: stats.memory_used_bytes !== undefined
-                            ? Format.bytesToGiB(stats.memory_used_bytes) + " / " + Format.bytesToGiB(stats.memory_total_bytes) + " GiB"
-                            : "—"
-                    },
-                    {
-                        title: "Uptime",
-                        value: Format.uptime(stats.uptime_secs)
-                    }
-                ]
+            StatTile {
+                width: (parent.width - Theme.spacing * 3) / 4
+                label: "CPU"
+                value: panel.stats ? panel.stats.cpu_percent.toFixed(0) + "%" : "—"
+                detail: panel.stats && panel.stats.load_average !== null
+                    ? "load " + panel.stats.load_average.toFixed(2)
+                    : ""
+                tone: panel.stats && panel.stats.cpu_percent > 80 ? Theme.toneWarn : Theme.text
+            }
 
-                delegate: Rectangle {
-                    required property var modelData
+            StatTile {
+                width: (parent.width - Theme.spacing * 3) / 4
+                label: "MEMORY"
+                value: panel.stats
+                    ? Format.bytesToGiB(panel.stats.memory_used_bytes) + "G"
+                    : "—"
+                detail: panel.stats
+                    ? "of " + Format.bytesToGiB(panel.stats.memory_total_bytes) + "G"
+                    : ""
+            }
 
-                    width: (panel.width - Theme.spacing * 2) / 3
-                    height: 82
-                    color: Theme.surfaceRaised
-                    radius: 14
-                    border.width: 1
-                    border.color: Theme.border
+            StatTile {
+                width: (parent.width - Theme.spacing * 3) / 4
+                label: "UPTIME"
+                value: panel.stats ? Format.uptime(panel.stats.uptime_secs) : "—"
+                detail: panel.session ? panel.session.compositor : ""
+                tone: Theme.textDim
+            }
 
-                    Column {
-                        anchors.centerIn: parent
-                        spacing: Theme.spacingTight
-
-                        Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            color: Theme.textDim
-                            font.family: "Inter"
-                            font.pixelSize: 11
-                            text: modelData.title
-                        }
-
-                        Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            color: Theme.text
-                            font.family: "Inter"
-                            font.pixelSize: 17
-                            font.weight: Font.DemiBold
-                            text: modelData.value
-                        }
-                    }
-                }
+            StatTile {
+                width: (parent.width - Theme.spacing * 3) / 4
+                label: "UNREAD"
+                value: bridge ? String(bridge.unreadCount) : "0"
+                detail: bridge && bridge.notifications ? bridge.notifications.length + " total" : ""
+                tone: bridge && bridge.unreadCount > 0 ? Theme.toneWarn : Theme.textDim
             }
         }
 
-        Flow {
+        // ---- what is happening ----
+
+        SectionHeader {
             width: parent.width
-            spacing: Theme.spacingTight
-
-            Repeater {
-                model: [
-                    {
-                        label: stats.load_average ? "Load " + stats.load_average.toFixed(2) : "Load —",
-                        dim: !stats.load_average
-                    },
-                    {
-                        label: (session.compositor ?? "unknown").toUpperCase(),
-                        dim: false
-                    },
-                    {
-                        label: "pid " + (snapshot.pid ?? "?"),
-                        dim: true
-                    }
-                ]
-
-                delegate: Rectangle {
-                    required property var modelData
-
-                    height: 22
-                    radius: 11
-                    color: Theme.surfaceRaised
-                    border.width: 1
-                    border.color: Theme.border
-                    width: chipText.implicitWidth + 20
-
-                    Text {
-                        id: chipText
-                        anchors.centerIn: parent
-                        color: modelData.dim ? Theme.textDim : Theme.text
-                        font.family: "Inter"
-                        font.pixelSize: 11
-                        text: modelData.label
-                    }
-                }
-            }
-        }
-
-        Text {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.textDim
-            font.family: "Inter"
-            font.pixelSize: 11
-            text: "Every stat above arrived over the isled socket as an unsolicited event. Nothing in the UI reads the system directly."
+            title: "Happening now"
+            note: panel.highlights.length > 0 ? panel.highlights.length + " ACTIVE" : "ALL QUIET"
         }
 
         Item {
             width: parent.width
-            height: 1
+            height: Math.max(40, panel.highlights.length * 44)
+
+            Text {
+                anchors.centerIn: parent
+                visible: panel.highlights.length === 0
+                text: "Nothing has asked for your attention."
+                color: Theme.textFaint
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontBody
+            }
+
+            Column {
+                anchors.fill: parent
+                spacing: 6
+
+                Repeater {
+                    model: panel.highlights
+
+                    Card {
+                        required property var modelData
+                        required property int index
+
+                        width: panel.width
+                        height: 40
+                        radius: Theme.radiusSmall
+
+                        Row {
+                            anchors.left: parent.left
+                            anchors.leftMargin: Theme.spacingTight + 2
+                            anchors.right: parent.right
+                            anchors.rightMargin: Theme.spacingTight + 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: Theme.spacingTight + 2
+
+                            Rectangle {
+                                width: 6
+                                height: 6
+                                radius: 3
+                                color: Theme.toneColor(modelData.tone ? modelData.tone : "neutral")
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+
+                            Icon {
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: modelData.glyph ? modelData.glyph : "spark"
+                                width: 14
+                                height: 14
+                                color: Theme.toneColor(modelData.tone ? modelData.tone : "neutral")
+                            }
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.max(0, parent.width - 120)
+                                text: modelData.title ? modelData.title : ""
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontBody
+                                font.weight: Font.Medium
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modelData.subtitle ? modelData.subtitle : ""
+                                color: Theme.textFaint
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontTiny
+                                elide: Text.ElideRight
+                                width: Math.min(implicitWidth, 120)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---- the timer and the next thing ----
+
+        Row {
+            width: parent.width
+            spacing: Theme.spacing
+
+            Card {
+                width: (parent.width - Theme.spacing) / 2
+                height: 74
+
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingTight + 4
+                    spacing: Theme.spacingTight + 2
+
+                    Icon {
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: "timer"
+                        width: 17
+                        height: 17
+                        color: panel.timer && panel.timer.running ? Theme.toneGood : Theme.textFaint
+                    }
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+                        width: parent.width - 30
+
+                        Text {
+                            width: parent.width
+                            text: panel.timer && panel.timer.phase && panel.timer.phase !== "idle"
+                                ? panel.timer.phase
+                                : "No timer running"
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontBody
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: panel.timer && panel.timer.remaining_ms
+                                ? Format.duration(panel.timer.remaining_ms) + " left"
+                                : "start one from the todos panel"
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontTiny
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
+
+            Card {
+                width: (parent.width - Theme.spacing) / 2
+                height: 74
+
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingTight + 4
+                    spacing: Theme.spacingTight + 2
+
+                    Icon {
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: "check-square"
+                        width: 17
+                        height: 17
+                        color: panel.todo ? Theme.toneWarn : Theme.textFaint
+                    }
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+                        width: parent.width - 30
+
+                        Text {
+                            width: parent.width
+                            text: panel.todo ? panel.todo.text : "Nothing scheduled"
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontBody
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: panel.todo && panel.todo.due_unix
+                                ? "due " + Format.until(panel.todo.due_unix)
+                                : "no deadline"
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontTiny
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -3,6 +3,14 @@
 A context-aware, dynamically morphing island shell for niri and hyprland.
 Reference mock: `ctos-dynamic-island-context-aware-v2.html` (visual reference only).
 
+> **Status, 2026-10-21.** Phases 0–2 are largely built, and parts of 3 and 5
+> with them: the daemon, the island's four appearances, all nine panels, the
+> activity engine, the persistence layer, the wallpaper catalog and the
+> calendar reader. `HANDOFF.md` §5 is the accurate description of what
+> exists; this document is the design it was built to. The two disagree in
+> three places, all noted inline below: the morph approach (§5.1), the
+> keybind scheme (§5.3, §9.4) and the persistence format (§3.1).
+
 **Scope note:** this shell is the successor to Ryoku, not a companion to it.
 `isled` is designed as the session's core daemon from day one. See §3.5.
 
@@ -147,8 +155,13 @@ custom layout). Budget +4-7 weeks over the hybrid and cut panels 5/6/7 first.
 **`isled` (Rust, no GUI)**
 - Owns *all* state. The UI is stateless-with-respect-to-truth.
 - Source implementations behind one `EventSource` trait.
-- Persistence in `~/.local/state/isled/` (SQLite for clipboard/history/todos/
-  wallpaper catalog, plain text for notes, JSON cache for calendar/media).
+- Persistence in `~/.local/state/isled/`.
+
+  > **Implemented as JSON files, not SQLite.** The volumes are tiny — hundreds
+  > of rows at most — and plain files are readable, diffable and repairable by
+  > hand. A database would buy nothing here and cost a build dependency.
+  > The notes are markdown files in a directory, which is what makes the
+  > Obsidian integration free.
 - Single-threaded event loop over `tokio`; each source is a task feeding a
   broadcast channel.
 
@@ -653,8 +666,13 @@ tracks the island means dropping the `left`/`right` anchors and positioning
 manually, which is not obviously worth it. `Behavior on width`/`height` on the
 inner rect still gives the morph; what is lost is the ability to compare A
 against B on the surface-reconfigure cost, which is the thing A vs B was
-supposed to measure. **This is the biggest unresolved Phase 0 question and it
-needs eyes on the real thing.**
+supposed to measure.
+
+> **Decided: approach B, and the surface never resizes at all.** The surface
+> is full width and tall enough for the tallest panel, so opening a panel
+> does not reconfigure the layer surface even once. Only the island inside
+> it changes shape. `IslandSettings.morphApproach` still holds approach A as
+> an option for comparison, but B is the default.
 
 ### 5.2 Focus lifecycle
 
@@ -694,9 +712,15 @@ complete, reorder is not a pill affordance), so it is a view:
 
 **Keybinds are now our choice** (§3.5) — no longer something to thread around
 another shell's generated config. The mock's plain `1-7` is not viable: in both
-niri and hyprland `Mod+1..9` is workspace switching. Proposal is `Mod+Alt+1..9`
-for direct view selection plus `Mod+Alt+J` to toggle expand, all of which are
-unbound by default. Confirm before Phase 1 wires them; it is open decision #8.
+niri and hyprland `Mod+1..9` is workspace switching.
+
+> **Decided: `Mod+Ctrl+1..9` for direct view selection, `Mod+Ctrl+J` to
+> toggle and `Mod+Ctrl+K` to focus.** Not `Mod+Alt`, which is what this
+> section used to say: niri resolves `Mod` to Super when no mod-key is set,
+> so `Mod+Alt+1..9` was literally `Super+Alt+1..9` — Ryoku's
+> move-window-to-workspace. `nix/keybinds.nix` produces the right shape for
+> both compositors; `PLAN.md` §9.4 and the old open decision #8 still say
+> `Mod+Alt` and are wrong.
 
 Morph on **view change only within expanded**, and **size change** on
 compact↔expanded. Content cross-fades on opacity with a slight scale, staggered
@@ -1116,8 +1140,9 @@ Then run the §5.2 focus matrix on both compositors.
 7. **Blur strategy.** niri *can* blur (§9.5) — the question is whether to wait for
    Quickshell to expose `BackgroundEffect`, force a `layer="top"` rule, or ship
    flat. Not a compositor capability question any more.
-8. **Keybind scheme** — `Mod+Alt+1..9` + `Mod+Alt+J` proposed; `Mod+1..9` is
-   taken by workspace switching in both compositors. (before Phase 1)
+8. ~~**Keybind scheme**~~ — settled: `Mod+Ctrl+1..9` + `Mod+Ctrl+J` +
+   `Mod+Ctrl+K`. `Mod+1..9` is taken by workspace switching in both
+   compositors, and `Mod+Alt` collides with Ryoku's window moves.
 9. **Video wallpapers** — ship without them (awww cannot display video, §4.4),
    or take on `mpvpaper` as a second engine? The answer decides whether browser
    handoff is worth keeping at all. (before Phase 4)

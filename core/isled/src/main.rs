@@ -1,9 +1,24 @@
 #![forbid(unsafe_code)]
 
+// The data layer is a coherent API in its own right: the panels are its
+// audience, and the tests below exercise the parts the daemon does not call
+// directly yet. Dead code is therefore expected here and is not a smell.
+#[allow(dead_code)]
+mod data;
+mod domain;
+#[allow(dead_code)]
+mod ics;
+mod network;
 mod notify;
 mod paths;
 mod server;
+mod settings;
 mod stats;
+#[allow(dead_code)]
+mod store;
+#[allow(dead_code)]
+mod tz;
+mod wallpaper;
 
 use isle_core::{ClientMessage, ServerMessage};
 use paths::{Args, parse_args, parse_args_json, socket_path};
@@ -92,19 +107,30 @@ async fn call(name: &str, raw: &str) -> ExitCode {
         let Ok(message) = serde_json::from_str::<ServerMessage>(&line) else {
             continue;
         };
-        if let ServerMessage::Reply { ok, error, .. } = message {
-            reply = Some((ok, error));
+        if let ServerMessage::Reply {
+            ok, error, data, ..
+        } = message
+        {
+            reply = Some((ok, error, data));
             break;
         }
     }
 
     match reply {
-        Some((true, _)) => ExitCode::SUCCESS,
-        Some((false, Some(error))) => {
+        Some((true, _, Some(data))) => {
+            // Print what came back, so the command line is useful on its own
+            // and not only as a way to drive the shell.
+            if let Ok(text) = serde_json::to_string_pretty(&data) {
+                println!("{text}");
+            }
+            ExitCode::SUCCESS
+        }
+        Some((true, _, None)) => ExitCode::SUCCESS,
+        Some((false, Some(error), _)) => {
             eprintln!("isled: {error}");
             ExitCode::FAILURE
         }
-        Some((false, None)) => {
+        Some((false, None, _)) => {
             eprintln!("isled: command failed");
             ExitCode::FAILURE
         }

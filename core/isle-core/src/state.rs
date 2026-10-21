@@ -59,6 +59,17 @@ pub struct Snapshot {
     pub features: Features,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notifications: Vec<Notification>,
+    /// The persistent condition that owns the island right now, if any. The
+    /// UI colours the idle dot from its tone.
+    ///
+    /// Boxed because an activity is a fat struct and the snapshot is
+    /// constructed on every connection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub activity: Option<Box<crate::live::Activity>>,
+    /// Everything the island has seen recently, newest first. The peek view
+    /// falls back to the first entry when nothing is ambient.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub activities: Vec<crate::live::Activity>,
 }
 
 impl Snapshot {
@@ -68,6 +79,8 @@ impl Snapshot {
             session,
             features,
             notifications: Vec::new(),
+            activity: None,
+            activities: Vec::new(),
         }
     }
 }
@@ -77,12 +90,33 @@ impl Snapshot {
         self.notifications = notifications.to_vec();
         self
     }
+
+    /// Attach the live-activity state. The ambient activity is the one the
+    /// island is currently anchored to.
+    pub fn with_activities(
+        mut self,
+        ambient: Option<&crate::live::Activity>,
+        recent: &[crate::live::Activity],
+    ) -> Self {
+        self.activity = ambient.cloned().map(Box::new);
+        self.activities = recent.to_vec();
+        self
+    }
 }
 
 pub fn unix_now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_secs())
+}
+
+/// Milliseconds since the epoch. Timers need finer resolution than a
+/// countdown rendered once a second can offer, and the pomodoro ring wants
+/// to move smoothly rather than tick.
+pub fn unix_now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64)
 }
 
 #[cfg(test)]

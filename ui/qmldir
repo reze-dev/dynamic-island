@@ -1,0 +1,11 @@
+module isle
+
+singleton Theme 1.0 Theme.qml
+singleton Format 1.0 Format.qml
+singleton Icons 1.0 Icons.qml
+singleton PanelCatalog 1.0 PanelCatalog.qml
+singleton IslandSettings 1.0 IslandSettings.qml
+
+IsledBridge 1.0 IsledBridge.qml
+Island 1.0 Island.qml
+PanelHost 1.0 PanelHost.qml

@@ -67,7 +67,15 @@ binary-is-fresh:
         exit 1
     fi
 
+# Builds the package from the working tree. The `path:` prefix matters: a
+# bare path resolves to the *git* tree, and the git tree does not have the
+# files that have not been committed yet. `nix build .#isled` is the
+# reproducible build, but it only sees committed sources.
 release:
+    nix build "path:{{repo}}#isled" --print-build-logs
+
+# The reproducible build: whatever is committed, nothing else.
+release-committed:
     nix build {{repo}}#isled --print-build-logs
 
 # ------------------------------------------------------------- qml / nix fmt
@@ -78,9 +86,29 @@ fmt-nix:
 fmt-qml:
     #!/usr/bin/env bash
     set -euo pipefail
-    for dir in {{ui}} {{ui}}/panels; do
+    for dir in {{ui}} {{ui}}/panels {{ui}}/components; do
         qmlformat -i "$dir" >/dev/null
     done
+
+# Static analysis of the QML. The import paths matter: without them qmllint
+# cannot see QtQuick or Quickshell and every type comes back as missing.
+lint-qml:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    qml_root="$(dirname "$(dirname "$(readlink -f "$(command -v qmllint)")")")/lib/qt-6/qml"
+    qs_root="$(dirname "$(dirname "$(readlink -f "$(command -v quickshell)")")")/lib/qt-6/qml"
+    if [ ! -d "$qml_root" ] || [ ! -d "$qs_root" ]; then
+        echo "could not find the QML import roots" >&2
+        exit 1
+    fi
+    status=0
+    for f in $(find {{ui}} -name '*.qml' | sort); do
+        if ! out=$(qmllint -I "$qml_root" -I "$qs_root" "$f" 2>&1); then
+            echo "$out"
+            status=1
+        fi
+    done
+    exit $status
 
 # Evaluates the Home Manager module against the live home-manager master.
 # Catches option drift without booting a machine.
@@ -89,7 +117,7 @@ eval-module: build
     nix-instantiate --eval --strict -A execstart /tmp/isle-eval2/eval.nix >/dev/null
 
 # Everything, in the order that catches problems earliest.
-check-all: check fmt-nix binary-is-fresh
+check-all: check lint-qml binary-is-fresh
 
 # ---------------------------------------------------------------- services
 
@@ -221,6 +249,41 @@ clear-all:
 view index:
     @{{bin}} call view.set '{"index":{{index}}}'
 
+# Pushes an activity into the island's queue, which is how the triggered
+# state is exercised without waiting for a real event. `--sticky` keeps it
+# as the ambient condition, so the idle dot takes its colour.
+activity kind="media" title="Glasshouse" subtitle="Aether" sticky="true":
+    @{{bin}} call activity.trigger \
+        '{"kind":"{{kind}}","title":"{{title}}","subtitle":"{{subtitle}}","sticky":{{sticky}},"glyph":"music"}'
+
+# The todo list. `just todo "standup 15m"` makes a todo due in a quarter of
+# an hour, which is the inline deadline syntax the panel also understands.
+todo text:
+    @{{bin}} call todos.add '{"text":"{{text}}"}'
+
+todos:
+    @{{bin}} call todos.list
+
+timer minutes="25":
+    @{{bin}} call timer.start '{"minutes":{{minutes}}}'
+
+timer-stop:
+    @{{bin}} call timer.stop '{}'
+
+notes:
+    @{{bin}} call notes.list
+
+wallpapers:
+    @{{bin}} call wallpaper.list
+
+wallpaper path:
+    @{{bin}} call wallpaper.set '{"path":"{{path}}"}'
+
+# The whole context in one call: what the island knows, what is on the list,
+# what the clock is doing, and what is on the screen.
+context:
+    @{{bin}} call context.summary
+
 # Snapshot as pretty JSON: `just snapshot | jq '.data.notifications'`
 snapshot:
     #!/usr/bin/env bash
@@ -241,11 +304,106 @@ ui-check:
     #!/usr/bin/env bash
     set -euo pipefail
     out=$(timeout 20 quickshell -p {{ui}} 2>&1 || true)
-    if echo "$out" | grep -qiE 'error|cannot assign|unavailable'; then
-        echo "$out" | grep -iE 'error|cannot assign|unavailable' | head -5
+    # The service warnings are environmental: a machine with no bluetooth
+    # daemon, no UPower or no notification bus is not a broken shell.
+    # The trailing `|| true` matters: with `set -e` and `pipefail`, a grep
+    # that matches nothing would otherwise fail the whole recipe.
+    bad=$(echo "$out" | grep -iE 'error|cannot assign|unavailable|binding loop|ReferenceError' \
+        | grep -avE 'bluez|UPower|portal|QLocalSocket|ServerNotFound|qt.qpa.services' || true)
+    if [ -n "$bad" ]; then
+        echo "$bad" | head -8
         exit 1
     fi
     echo "qml loads clean"
+
+# ------------------------------------------------------------------ the demo
+
+# A scripted demo: the daemon on a scratch socket, the real shell, and a
+# sequence of events the island reacts to. Watch it on the screen.
+demo:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if systemctl --user is-active --quiet quickshell 2>/dev/null; then
+        echo "note: the installed shell is already running, so the demo's own" >&2
+        echo "      island will sit next to it. Stop it with: just stop" >&2
+        echo >&2
+    fi
+    {{repo}}/tools/demo.sh
+
+# Triggers a single event, so you can poke at the island yourself. The
+# daemon has to be running: `just start`, or `just demo` in another shell.
+#
+#   just trigger media | notification | todo | clipboard | timer | panel
+trigger what="notification":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -S "${ISLED_SOCKET}" ]; then
+        echo "no daemon at ${ISLED_SOCKET}" >&2
+        echo "start one with: just start   (or: just demo)" >&2
+        exit 1
+    fi
+    case "{{what}}" in
+    media)
+        {{bin}} call activity.trigger \
+            '{"kind":"media","title":"Glasshouse","subtitle":"Aether","glyph":"music","sticky":true,"source":"spotify","tone":"info"}'
+        ;;
+    notification)
+        {{bin}} call notifications.send \
+            '{"app_name":"northstar","summary":"Build completed","body":"dev shell evaluated successfully","hints":{"urgency":{"Byte":1}}}'
+        ;;
+    todo)
+        {{bin}} call todos.add '{"text":"ship the island","due_in_minutes":0}'
+        ;;
+    clipboard)
+        {{bin}} call clipboard.add '{"text":"nix develop .#devShells.x86_64-linux.default"}'
+        ;;
+    timer)
+        {{bin}} call timer.start '{"minutes":25}'
+        ;;
+    panel)
+        {{bin}} call view.set 0
+        ;;
+    *)
+        echo "unknown trigger: {{what}}" >&2
+        echo "one of: media notification todo clipboard timer panel" >&2
+        exit 1
+        ;;
+    esac
+
+# The morph, as a GIF. Renders the island headless, photographs it while the
+# animations run, and assembles the frames. The one thing a screenshot
+# cannot show.
+demo-anim dir="/tmp/isle-anim":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p "{{dir}}/frames"
+    rm -f "{{dir}}/frames"/*.png
+    cd {{ui}}
+    ISLED_DEMO_FRAMES="{{dir}}/frames" QT_QPA_PLATFORM=offscreen \
+        timeout 90 quickshell -p demo.qml >/dev/null 2>&1 || true
+    frames=$(ls -1 "{{dir}}/frames"/*.png 2>/dev/null | wc -l)
+    echo "captured $frames frames"
+    if [ "$frames" -lt 2 ]; then
+        echo "not enough frames to make a gif" >&2
+        exit 1
+    fi
+    magick -delay 4 -loop 0 "{{dir}}/frames"/*.png "{{dir}}/island.gif"
+    echo "--- {{dir}}/island.gif"
+
+# ------------------------------------------------------------- the preview
+
+# Renders the island in each of its appearances and writes the pictures out.
+# The design is the part of this project that no test can check, so being
+# able to *look* at it without a compositor is worth the small rig.
+preview dir="/tmp/isle-preview":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p "{{dir}}"
+    rm -f "{{dir}}"/*.png
+    cd {{ui}}
+    QT_QPA_PLATFORM=offscreen timeout 120 quickshell -p preview.qml >/dev/null 2>&1 || true
+    ls -1 "{{dir}}"/*.png 2>/dev/null | sed 's|.*/|  |'
+    echo "--- written to {{dir}}"
 
 # ------------------------------------------------------------ scratch dirs
 

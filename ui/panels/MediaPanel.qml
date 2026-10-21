@@ -1,20 +1,26 @@
 import QtQuick
 import Quickshell.Services.Mpris
 import ".."
+import "../components"
 
-Rectangle {
+// Now playing.
+//
+// This one reads MPRIS directly, through Quickshell's own service, rather
+// than asking the daemon. The daemon is the right place for state the shell
+// owns; a media player is somebody else's state and the bus already has it.
+Item {
     id: panel
 
-    // The model fills in asynchronously after the bus is read, so this has to be
-    // a binding and not a one-shot read: checking it in onCompleted sees an
-    // empty list and never updates.
+    property var bridge: null
+
+    // The model fills in asynchronously after the bus is read, so this has to
+    // be a binding and not a one-shot read: checking it in onCompleted sees
+    // an empty list and never updates.
     readonly property var players: Mpris.players.values
     readonly property bool hasPlayer: panel.players != null && panel.players.length > 0
 
     // QML evaluates bindings whether or not an item is visible, so every read
-    // goes through a stand-in rather than a null check at each use. A plain
-    // object beats a QtObject property here: it has no construction order to
-    // get wrong and cannot be null.
+    // goes through a stand-in rather than a null check at each use.
     readonly property var p: panel.hasPlayer ? panel.players[0] : {
         "identity": "",
         "trackTitle": "",
@@ -30,8 +36,6 @@ Rectangle {
         "canTogglePlaying": false
     }
 
-    color: "transparent"
-
     function mmss(seconds) {
         if (seconds === undefined || seconds === null || !isFinite(seconds) || seconds < 0)
             return "0:00";
@@ -41,271 +45,216 @@ Rectangle {
         return minutes + ":" + (secs < 10 ? "0" + secs : "" + secs);
     }
 
+    SectionHeader {
+        id: header
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: Theme.spacing
+        title: "Now playing"
+        note: panel.hasPlayer ? "MPRIS" : ""
+    }
+
+    // The empty state.
     Column {
-        anchors.fill: parent
-        anchors.margins: Theme.spacingLoose
-        spacing: Theme.spacing
+        anchors.centerIn: parent
+        spacing: Theme.spacingTight
+        visible: !panel.hasPlayer
 
-        Row {
-            width: parent.width
-            height: 30
+        Icon {
+            anchors.horizontalCenter: parent.horizontalCenter
+            name: "music"
+            width: 24
+            height: 24
+            color: Theme.textFaint
+        }
 
-            Text {
-                text: "Now playing"
-                color: Theme.text
-                font.family: "Inter"
-                font.pixelSize: 24
-                font.weight: Font.Bold
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "Nothing is playing."
+            color: Theme.textFaint
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontBody
+        }
+    }
+
+    // The player.
+    Item {
+        anchors.top: header.bottom
+        anchors.topMargin: Theme.spacing
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: Theme.spacing
+        anchors.rightMargin: Theme.spacing
+        anchors.bottomMargin: Theme.spacing
+        visible: panel.hasPlayer
+
+        Rectangle {
+            id: art
+            width: 116
+            height: 116
+            radius: Theme.radiusCard
+            anchors.left: parent.left
+            anchors.top: parent.top
+            color: Theme.well
+            border.width: 1
+            border.color: Theme.border
+            clip: true
+
+            Image {
+                anchors.fill: parent
+                source: panel.p.trackArtUrl ? panel.p.trackArtUrl : ""
+                asynchronous: true
+                fillMode: Image.PreserveAspectCrop
+
+                onStatusChanged: {
+                    if (status === Image.Error)
+                        source = "";
+                }
             }
 
-            Item {
-                width: Math.max(0, parent.width - 200)
-                height: 30
+            Icon {
+                anchors.centerIn: parent
+                visible: panel.p.trackArtUrl === ""
+                name: "disc"
+                width: 28
+                height: 28
+                color: Theme.toneFaint ? Theme.textFaint : Theme.textFaint
+            }
+        }
+
+        Column {
+            anchors.left: art.right
+            anchors.leftMargin: Theme.spacing
+            anchors.right: parent.right
+            anchors.top: parent.top
+            spacing: 3
+
+            Text {
+                width: parent.width
+                text: panel.p.trackTitle ? panel.p.trackTitle : "Unknown track"
+                color: Theme.text
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontTitle
+                font.weight: Font.DemiBold
+                font.letterSpacing: -0.3
+                elide: Text.ElideRight
+            }
+
+            Text {
+                width: parent.width
+                text: panel.p.trackArtist ? panel.p.trackArtist : ""
+                color: Theme.textDim
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSmall
+                elide: Text.ElideRight
+            }
+
+            Text {
+                width: parent.width
+                visible: panel.p.identity !== ""
+                text: panel.p.identity
+                color: Theme.textFaint
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontTiny
+                elide: Text.ElideRight
+            }
+        }
+
+        // The progress bar.
+        Item {
+            id: progress
+            anchors.top: art.bottom
+            anchors.topMargin: Theme.spacing
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 20
+
+            Rectangle {
+                id: track
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                height: 3
+                radius: 1.5
+                color: Qt.rgba(1, 1, 1, 0.10)
             }
 
             Rectangle {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: panel.hasPlayer
-                height: 20
-                radius: 10
-                color: Theme.surfaceRaised
-                border.width: 1
-                border.color: Theme.border
-                width: sourceText.implicitWidth + 16
+                id: fill
+                anchors.left: track.left
+                anchors.verticalCenter: track.verticalCenter
+                height: track.height
+                radius: track.radius
+                width: panel.p.lengthSupported && panel.p.length > 0
+                    ? track.width * Math.min(1, panel.p.position / panel.p.length)
+                    : 0
+                color: Theme.text
 
-                Text {
-                    id: sourceText
-                    anchors.centerIn: parent
-                    color: Theme.textDim
-                    font.family: "Inter"
-                    font.pixelSize: 11
-                    text: panel.p.identity
+                Behavior on width {
+                    NumberAnimation {
+                        duration: 700
+                        easing.type: Easing.Linear
+                    }
                 }
             }
-        }
-
-        Rectangle {
-            width: parent.width
-            height: 76
-            radius: 20
-            color: Theme.surfaceRaised
-            border.width: 1
-            border.color: Theme.border
-            visible: !panel.hasPlayer
-
-            Text {
-                anchors.centerIn: parent
-                color: Theme.textDim
-                font.family: "Inter"
-                font.pixelSize: 13
-                text: "No MPRIS player. Start something and it appears here."
-            }
-        }
-
-        Rectangle {
-            width: parent.width
-            height: 132
-            radius: 20
-            color: Theme.surfaceRaised
-            border.width: 1
-            border.color: Theme.border
-            visible: panel.hasPlayer
 
             Row {
-                anchors.fill: parent
-                anchors.margins: Theme.spacing
-                spacing: Theme.spacing
+                anchors.top: track.bottom
+                anchors.topMargin: 5
+                anchors.left: parent.left
+                anchors.right: parent.right
 
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 92
-                    height: 92
-                    radius: 30
-                    color: "transparent"
-                    border.width: 1
-                    border.color: Theme.border
-
-                    Image {
-                        id: art
-                        anchors.fill: parent
-                        anchors.margins: 5
-                        fillMode: Image.PreserveAspectFit
-                        asynchronous: true
-                        cache: true
-                        sourceSize.width: 192
-                        sourceSize.height: 192
-                        visible: status === Image.Ready
-                        source: panel.p.trackArtUrl ? panel.p.trackArtUrl : ""
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 30
-                        visible: art.status !== Image.Ready
-                        color: Qt.rgba(1, 1, 1, 0.03)
-
-                        Text {
-                            anchors.centerIn: parent
-                            color: Theme.textDim
-                            font.family: "Inter"
-                            font.pixelSize: 26
-                            text: "♪"
-                        }
-                    }
+                Text {
+                    text: panel.mmss(panel.p.position)
+                    color: Theme.textFaint
+                    font.family: Theme.monoFamily
+                    font.pixelSize: Theme.fontTiny
                 }
 
-                Column {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(0, parent.width - 92 - Theme.spacing)
-                    spacing: 5
+                Item {
+                    width: Math.max(0, parent.width - 80)
+                }
 
-                    Text {
-                        width: parent.width
-                        color: Theme.text
-                        font.family: "Inter"
-                        font.pixelSize: 15
-                        font.weight: Font.DemiBold
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                        text: panel.p.trackTitle !== "" ? panel.p.trackTitle : "Unknown title"
-                    }
-
-                    Text {
-                        width: parent.width
-                        color: Theme.textDim
-                        font.family: "Inter"
-                        font.pixelSize: 12
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                        text: panel.p.trackArtist !== "" ? panel.p.trackArtist : panel.p.trackAlbum
-                    }
-
-                    Rectangle {
-                        width: parent.width
-                        height: 4
-                        radius: 2
-                        color: Qt.rgba(1, 1, 1, 0.09)
-                        visible: panel.p.length > 0
-
-                        Rectangle {
-                            width: parent.width * (panel.p.length > 0
-                                ? Math.min(1, panel.p.position / panel.p.length)
-                                : 0)
-                            height: parent.height
-                            radius: 2
-                            color: Theme.accent
-
-                            Behavior on width {
-                                NumberAnimation {
-                                    duration: 700
-                                    easing.type: Easing.Linear
-                                }
-                            }
-                        }
-                    }
-
-                    Row {
-                        width: parent.width
-                        visible: panel.p.length > 0
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            color: Theme.textDim
-                            font.family: "Inter"
-                            font.pixelSize: 10
-                            text: panel.mmss(panel.p.position)
-                        }
-
-                        Item {
-                            width: Math.max(0, parent.width - 90)
-                            height: 10
-                        }
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            color: Theme.textDim
-                            font.family: "Inter"
-                            font.pixelSize: 10
-                            text: panel.mmss(panel.p.length)
-                        }
-                    }
+                Text {
+                    text: panel.p.lengthSupported ? panel.mmss(panel.p.length) : "--:--"
+                    color: Theme.textFaint
+                    font.family: Theme.monoFamily
+                    font.pixelSize: Theme.fontTiny
                 }
             }
         }
 
+        // The transport.
         Row {
+            anchors.bottom: parent.bottom
             anchors.horizontalCenter: parent.horizontalCenter
-            spacing: Theme.spacing
-            visible: panel.hasPlayer
+            spacing: Theme.spacingLoose
 
-            Rectangle {
-                width: 38
-                height: 38
-                radius: 19
-                opacity: panel.p.canGoPrevious ? 1 : 0.35
-                color: Theme.surfaceRaised
-                border.width: 1
-                border.color: Theme.border
-
-                Text {
-                    anchors.centerIn: parent
-                    color: Theme.text
-                    font.family: "Inter"
-                    font.pixelSize: 14
-                    text: "‹‹"
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: panel.players[0].previous()
-                    }
-                }
+            IconButton {
+                icon: "prev"
+                size: 34
+                enabled: panel.p.canGoPrevious
+                tooltip: "Previous"
+                onClicked: panel.p.canGoPrevious ? panel.p.previous() : null
             }
 
-            Rectangle {
-                width: 52
-                height: 52
-                radius: 26
-                opacity: panel.p.canTogglePlaying ? 1 : 0.35
-                color: Theme.accent
-
-                Text {
-                    anchors.centerIn: parent
-                    color: "#0b0e15"
-                    font.family: "Inter"
-                    font.pixelSize: 17
-                    text: panel.p.isPlaying ? "❙❙" : "▶"
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: panel.players[0].togglePlaying()
-                    }
-                }
+            IconButton {
+                icon: panel.p.isPlaying ? "pause" : "play"
+                size: 42
+                enabled: panel.p.canTogglePlaying
+                active: panel.p.isPlaying
+                tooltip: panel.p.isPlaying ? "Pause" : "Play"
+                onClicked: panel.p.canTogglePlaying ? panel.p.togglePlaying() : null
             }
 
-            Rectangle {
-                width: 38
-                height: 38
-                radius: 19
-                opacity: panel.p.canGoNext ? 1 : 0.35
-                color: Theme.surfaceRaised
-                border.width: 1
-                border.color: Theme.border
-
-                Text {
-                    anchors.centerIn: parent
-                    color: Theme.text
-                    font.family: "Inter"
-                    font.pixelSize: 14
-                    text: "››"
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: panel.players[0].next()
-                    }
-                }
+            IconButton {
+                icon: "next"
+                size: 34
+                enabled: panel.p.canGoNext
+                tooltip: "Next"
+                onClicked: panel.p.canGoNext ? panel.p.next() : null
             }
         }
     }

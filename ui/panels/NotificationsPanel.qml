@@ -1,235 +1,244 @@
 import QtQuick
 import ".."
+import "../components"
 
-Rectangle {
+// The notification history.
+//
+// The daemon owns the list; this is the reading of it. Each notification
+// knows its urgency, and a critical one is tinted so it stands out from the
+// pile without needing to be read.
+Item {
     id: panel
 
-    property var notifications: []
-    property int unreadCount: 0
-    property bool holdingBusName: false
+    property var bridge: null
 
-    signal dismissed(int id)
-    signal clearedAll()
-    signal actionInvoked(int id, string key)
+    readonly property var notifications: bridge && bridge.notifications ? bridge.notifications : []
+    readonly property int unreadCount: bridge ? bridge.unreadCount : 0
+    readonly property bool holdingBusName: bridge && bridge.snapshot && bridge.snapshot.features
+        ? bridge.snapshot.features.notifications === true
+        : false
 
-    color: "transparent"
-
-    function ago(timestamp) {
-        if (timestamp === undefined || timestamp === null)
-            return "";
-        var seconds = Math.floor(Date.now() / 1000) - timestamp;
-        if (seconds < 0)
-            seconds = 0;
-        if (seconds < 5)
-            return "now";
-        if (seconds < 60)
-            return seconds + "s";
-        var minutes = Math.floor(seconds / 60);
-        if (minutes < 60)
-            return minutes + "m";
-        var hours = Math.floor(minutes / 60);
-        if (hours < 24)
-            return hours + "h";
-        return Math.floor(hours / 24) + "d";
+    SectionHeader {
+        id: header
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: Theme.spacing
+        title: "History"
+        note: panel.notifications.length > 0
+            ? panel.notifications.length + " · " + panel.unreadCount + " new"
+            : ""
     }
 
+    Rectangle {
+        id: clearButton
+        anchors.top: header.bottom
+        anchors.right: parent.right
+        anchors.topMargin: Theme.spacingTight
+        anchors.rightMargin: Theme.spacing
+        width: clearLabel.implicitWidth + 20
+        height: 24
+        radius: Theme.radiusSmall
+        color: clearArea.containsMouse ? Theme.cardHover : Theme.card
+        border.width: 1
+        border.color: Theme.border
+        visible: panel.notifications.length > 0
+
+        Text {
+            id: clearLabel
+            anchors.centerIn: parent
+            text: "Clear all"
+            color: Theme.textDim
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontTiny
+            font.weight: Font.Medium
+        }
+
+        MouseArea {
+            id: clearArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: panel.bridge ? panel.bridge.clearNotifications() : null
+        }
+    }
+
+    // The empty state has to be honest about why it is empty.
     Column {
-        anchors.fill: parent
-        anchors.margins: Theme.spacingLoose
-        spacing: Theme.spacing
+        anchors.centerIn: parent
+        spacing: Theme.spacingTight
+        visible: panel.notifications.length === 0
 
-        Row {
-            width: parent.width
-            height: 30
-
-            Text {
-                text: "Notifications"
-                color: Theme.text
-                font.family: "Inter"
-                font.pixelSize: 24
-                font.weight: Font.Bold
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: panel.notifications.length > 0
-                color: Theme.textDim
-                font.family: "Inter"
-                font.pixelSize: 13
-                text: "   " + panel.notifications.length
-                    + (panel.unreadCount > 0 ? "  ·  " + panel.unreadCount + " new" : "")
-            }
-
-            Item {
-                width: parent.width - 170
-                height: 30
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: panel.notifications.length > 0
-                color: Theme.accent
-                font.family: "Inter"
-                font.pixelSize: 12
-                text: "Clear all"
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: panel.clearedAll()
-                }
-            }
+        Icon {
+            anchors.horizontalCenter: parent.horizontalCenter
+            name: "bell"
+            width: 22
+            height: 22
+            color: Theme.textFaint
         }
 
         Text {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            visible: panel.notifications.length === 0
-            color: Theme.textDim
-            font.family: "Inter"
-            font.pixelSize: 13
+            anchors.horizontalCenter: parent.horizontalCenter
             text: panel.holdingBusName
                 ? "Nothing yet. Anything calling org.freedesktop.Notifications lands here."
-                : "Idle — isled is not holding the bus name, so nothing arrives here yet."
+                : "isled is not holding the bus name, so nothing else can be seen here."
+            color: Theme.textFaint
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSmall
+            horizontalAlignment: Text.AlignHCenter
+            width: 340
+            wrapMode: Text.WordWrap
         }
+    }
 
-        ListView {
-            width: parent.width
-            height: Math.max(0, panel.height - 120)
-            clip: true
-            spacing: Theme.spacingTight
-            visible: panel.notifications.length > 0
-            model: panel.notifications
+    ListView {
+        id: list
+        anchors.top: clearButton.visible ? clearButton.bottom : header.bottom
+        anchors.topMargin: Theme.spacing
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: Theme.spacing
+        anchors.rightMargin: Theme.spacing
+        anchors.bottomMargin: Theme.spacing
+        clip: true
+        spacing: 6
+        model: panel.notifications
 
-            delegate: Rectangle {
-                id: row
+        delegate: Card {
+            id: entry
+            required property var modelData
 
-                required property var modelData
+            width: list.width
+            height: row.implicitHeight + Theme.spacingTight * 2
+            radius: Theme.radiusSmall
 
-                width: ListView.view.width
-                height: body.height + Theme.spacing
-                radius: 14
-                color: modelData.urgency === 2
-                    ? Qt.rgba(0.62, 0.30, 0.36, 0.32)
-                    : Theme.surfaceRaised
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                color: "transparent"
                 border.width: 1
-                border.color: Theme.border
+                border.color: entry.modelData.urgency === 2
+                    ? Qt.rgba(Theme.toneCritical.r, Theme.toneCritical.g, Theme.toneCritical.b, 0.35)
+                    : "transparent"
+            }
+
+            Row {
+                id: row
+                anchors.left: parent.left
+                anchors.leftMargin: Theme.spacingTight + 2
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.spacingTight + 2
+                anchors.top: parent.top
+                anchors.topMargin: Theme.spacingTight
+                spacing: Theme.spacingTight + 2
+
+                Rectangle {
+                    width: 26
+                    height: 26
+                    radius: 8
+                    color: Qt.rgba(Theme.toneColor(entry.modelData.urgency === 2 ? "critical" : "info").r,
+                        Theme.toneColor(entry.modelData.urgency === 2 ? "critical" : "info").g,
+                        Theme.toneColor(entry.modelData.urgency === 2 ? "critical" : "info").b, 0.16)
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Icon {
+                        anchors.centerIn: parent
+                        name: "bell"
+                        width: 13
+                        height: 13
+                        color: Theme.toneColor(entry.modelData.urgency === 2 ? "critical" : "info")
+                    }
+                }
 
                 Column {
-                    id: body
-
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: Theme.spacingTight
-                    spacing: 5
+                    width: Math.max(0, parent.width - 130)
+                    spacing: 2
 
                     Row {
-                        width: body.width
-                        height: 14
+                        width: parent.width
+                        spacing: Theme.spacingTight
 
-                        Rectangle {
-                            width: 5
-                            height: 5
-                            anchors.verticalCenter: parent.verticalCenter
-                            radius: 3
-                            color: modelData.urgency === 2
-                                ? Qt.rgba(0.96, 0.42, 0.48, 1)
-                                : Theme.accent
-                        }
-
-                        Item {
-                            width: 7
-                            height: 14
+                        Text {
+                            text: entry.modelData.app_name ? entry.modelData.app_name : "unknown"
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontTiny
+                            font.weight: Font.Medium
+                            elide: Text.ElideRight
+                            width: Math.min(implicitWidth, 90)
                         }
 
                         Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            color: Theme.textDim
-                            font.family: "Inter"
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                            text: modelData.app_name || "unknown"
-                        }
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            color: Theme.textDim
-                            font.family: "Inter"
-                            font.pixelSize: 11
-                            text: "   " + ago(modelData.received_at_unix)
+                            text: Format.ago(entry.modelData.received_at_unix)
+                            color: Theme.textFaint
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontTiny
                         }
                     }
 
                     Text {
-                        width: body.width
+                        width: parent.width
+                        text: entry.modelData.summary ? entry.modelData.summary : "(no summary)"
                         color: Theme.text
-                        font.family: "Inter"
-                        font.pixelSize: 14
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontBody
                         font.weight: Font.DemiBold
                         elide: Text.ElideRight
-                        text: modelData.summary || ""
                     }
 
                     Text {
-                        width: body.width
-                        wrapMode: Text.WordWrap
-                        visible: (modelData.body || "") !== ""
+                        width: parent.width
+                        visible: entry.modelData.body !== ""
+                        text: entry.modelData.body
                         color: Theme.textDim
-                        font.family: "Inter"
-                        font.pixelSize: 12
-                        maximumLineCount: 3
-                        text: modelData.body || ""
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSmall
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                        wrapMode: Text.WordWrap
                     }
 
-                    Row {
-                        width: body.width
-                        height: 16
-                        visible: (modelData.actions || []).length > 0
+                    Flow {
+                        width: parent.width
+                        spacing: 6
+                        visible: !!(entry.modelData.actions && entry.modelData.actions.length > 0)
 
                         Repeater {
-                            model: modelData.actions || []
+                            model: entry.modelData.actions ? entry.modelData.actions : []
 
-                            delegate: Text {
+                            Chip {
                                 required property var modelData
-
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: Theme.accent
-                                font.family: "Inter"
-                                font.pixelSize: 11
-                                text: modelData.label || modelData.key
+                                text: modelData.label ? modelData.label : modelData.key
+                                tone: Theme.toneInfo
 
                                 MouseArea {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: panel.actionInvoked(row.modelData.id, modelData.key)
+                                    onClicked: panel.bridge
+                                        ? panel.bridge.invokeAction(entry.modelData.id, modelData.key)
+                                        : null
                                 }
                             }
-
-                            Text {
-                                width: 14
-                                height: 16
-                            }
                         }
+                    }
+                }
 
-                        Item {
-                            width: Math.max(0, body.width - 100)
-                            height: 16
-                        }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "dismiss"
+                    color: dismissArea.containsMouse ? Theme.text : Theme.textFaint
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontTiny
+                    font.weight: Font.Medium
 
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            color: Theme.textDim
-                            font.family: "Inter"
-                            font.pixelSize: 11
-                            text: "Dismiss"
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: panel.dismissed(row.modelData.id)
-                            }
-                        }
+                    MouseArea {
+                        id: dismissArea
+                        anchors.fill: parent
+                        anchors.margins: -6
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: panel.bridge ? panel.bridge.dismissNotification(entry.modelData.id) : null
                     }
                 }
             }

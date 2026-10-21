@@ -1,4 +1,11 @@
 module panels
+
 ContextPanel 1.0 ContextPanel.qml
 MediaPanel 1.0 MediaPanel.qml
 NotificationsPanel 1.0 NotificationsPanel.qml
+ClipboardPanel 1.0 ClipboardPanel.qml
+CalendarPanel 1.0 CalendarPanel.qml
+TodosPanel 1.0 TodosPanel.qml
+NotesPanel 1.0 NotesPanel.qml
+NetworkPanel 1.0 NetworkPanel.qml
+ThemePanel 1.0 ThemePanel.qml

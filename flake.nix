@@ -112,5 +112,12 @@
     );
 
     formatter = forEachSystem (pkgs: pkgs.alejandra);
+
+    # The keybind definitions, for the target system flake to import. The
+    # compositor never learns the island's protocol; it only ever runs
+    # `isled call`, and these are those command lines.
+    lib = {
+      keybinds = import ./nix/keybinds.nix { lib = nixpkgs.lib; };
+    };
   };
 }
