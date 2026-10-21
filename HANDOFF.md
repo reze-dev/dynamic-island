@@ -189,7 +189,17 @@ curl 'https://wallhaven.cc/api/v1/search?categories=100&purity=100&sorting=topli
 | systemd user | running |
 | rustc | 1.99.0 via rustup; 1.98.1 in the devshell |
 
-### 4.5 What Ryoku owns that we inherit
+### 4.5 What the old shell owned, and what owns it now
+
+| Bus name | Owned by |
+|---|---|
+| `org.freedesktop.Notifications` | the island, with `--claim-notifications` |
+| `org.kde.StatusNotifierWatcher` | the island, with `--claim-tray` |
+
+Both are asked for with `DoNotQueue` and without `ReplaceExisting`, so the
+daemon refuses the name rather than taking it from whatever already has it.
+
+### 4.6 What Ryoku owns that we inherit
 
 **Portals are free.** `xdg-desktop-portal`, `-gnome`, `-gtk` are stock nixpkgs
 systemd user units. ScreenCast, Notification, Secret, OpenURI all survive
@@ -204,7 +214,7 @@ Ryoku's removal.
 **The notification daemon and the tray are bus-name obligations.** Claim both
 before removing Ryoku, or the gap is visible to every other program on the bus.
 
-### 4.6 Compositors
+### 4.7 Compositors
 
 **Niri** — `$NIRI_SOCKET`, newline-delimited JSON. `Request::EventStream` (since
 0.1.9) streams full state then deltas; no polling. Detect via `$NIRI_SOCKET`.
@@ -212,7 +222,7 @@ before removing Ryoku, or the gap is visible to every other program on the bus.
 **Hyprland** — `hyprctl -j` for queries, `event/socket2` for push. Detect via
 `$HYPRLAND_INSTANCE_SIGNATURE`.
 
-### 4.7 Research traps — things that will waste your time
+### 4.8 Research traps — things that will waste your time
 
 1. `wallhaven.cc/api/documentation` → 404. The API is fine.
 2. `gitlab.com/LGFae/awww` and `awww.gitlab.io` → 403 Cloudflare. Use Codeberg.
@@ -230,7 +240,7 @@ before removing Ryoku, or the gap is visible to every other program on the bus.
    `path:` on purpose so it builds what is on disk; `just release-committed`
    is the reproducible one.
 
-### 4.8 Quickshell constraints, found the hard way
+### 4.9 Quickshell constraints, found the hard way
 
 Quickshell 0.3's QML engine exposes `QtQuick` and `Quickshell.*`.
 
@@ -252,6 +262,13 @@ Quickshell 0.3's QML engine exposes `QtQuick` and `Quickshell.*`.
 - `PanelWindow` has no `horizontalCenter` anchor and no `above` property.
   `width`/`height` are deprecated in favour of `implicitWidth`/`implicitHeight`.
 - The property is `aboveWindows`, not `above`.
+- **`QtObject` has no default property**, so a bare `Timer { }` child of one
+  fails with "Cannot assign to non-existent default property". Declare it
+  as `property Timer foo: Timer { }` instead.
+- **The bus runs its own executor**, which has no tokio runtime of its own.
+  A `tokio::spawn` inside a `#[zbus::interface]` method panics with "there
+  is no reactor running". Make the method `async` and await the work
+  directly.
 - **A file loaded as a root config does not get the parent directory's
   imports.** `import ".."` from a subdirectory resolves to nothing when
   quickshell loads that file directly, so the singletons and the types in
@@ -259,7 +276,7 @@ Quickshell 0.3's QML engine exposes `QtQuick` and `Quickshell.*`.
   (a panel, say) resolves them fine. The preview rig lives at `ui/preview.qml`
   for exactly this reason: it has to be in the same module as the island.
 
-### 4.9 Blur: niri can, Quickshell cannot ask
+### 4.10 Blur: niri can, Quickshell cannot ask
 
 niri 26.04 implements `ext-background-effect-v1` with blur. It can be forced
 from the compositor side with a `layer-rule { background-effect { blur true } }`.
@@ -273,7 +290,7 @@ targeted separately from Ryoku's.
 Also note: a translucent surface looks like blur and is not — that is the
 distinction worth keeping straight.
 
-### 4.10 Two Quickshell limits that shape the whole UI
+### 4.11 Two Quickshell limits that shape the whole UI
 
 Both exist in Quickshell's *internal* `Quickshell/Wayland/_WlrLayerShell` but
 are **not exposed on `PanelWindow` in 0.3.0 or 0.3.2**.
@@ -326,12 +343,13 @@ saying something else" — `ui/components/SlideActivity.qml`.
 | 1 | **context** | The daemon's `context.summary`: vitals, what is happening now, the timer, the next todo. |
 | 2 | **media** | `Quickshell.Services.Mpris`. No Rust involved. |
 | 3 | **notifications** | The daemon, which owns `org.freedesktop.Notifications`. |
-| 4 | **clipboard** | The daemon's history. `wl-copy` to paste back, `wl-paste` to capture. |
+| 4 | **clipboard** | The daemon's history, which fills itself: `wl-paste --watch` runs a hook that files each selection, so a multi-line selection survives intact. `wl-copy` to paste back. |
 | 5 | **calendar** | The daemon reads `.ics` files and lays the next fourteen hours out by the hour. |
 | 6 | **todos** | The daemon's list, plus the pomodoro. A deadline can be written inline: `standup 15m`. |
 | 7 | **notes** | Markdown files in a directory. Point it at an Obsidian vault and the panel offers to open the note there. |
 | 8 | **network** | `Quickshell.Networking` and `Quickshell.Bluetooth`, plus `Quickshell.Services.UPower` for the battery. |
 | 9 | **theme** | The daemon's wallpaper catalog: a grid of thumbnails, a directory to change, and the rotation switch. |
+| — | **tray** | The daemon is a StatusNotifierHost. Reached with `Mod+Ctrl+T` rather than a number, because a system tray is a different kind of thing from a panel. |
 
 ### 5.3 The activity engine
 
@@ -382,6 +400,7 @@ wallpaper.loop          wallpaper.next           wallpaper.status
 calendar.events         calendar.dir
 settings.get            settings.set
 network.wifi            context.summary
+tray.list               tray.activate           tray.secondary
 notifications.dismiss   notifications.clear       notifications.action    notifications.send
 ```
 
@@ -479,15 +498,13 @@ Still open, in this order:
 
 11. ~~**Wire the shell into the system flake.**~~ Done: `/home/reze/Michi`
     imports the island, the module is enabled, the keybinds are merged into
-    niri's, mako is gone and the island owns the notification bus name.
+    niri's, mako is gone, and the island owns both
+    `org.freedesktop.Notifications` and `org.kde.StatusNotifierWatcher`.
     **It still needs `nixos-rebuild switch`, and then a logout or a
     restart of the session** — the island's target hangs off the graphical
     session, so it starts with the session rather than with a rebuild.
-12. **The system tray.** `org.kde.StatusNotifierWatcher` has no owner on
-    this machine now. The old shell was the last one, so tray icons have
-    nowhere to appear. The plan lists it as an obligation the island
-    inherited (§3.5), and it is the one thing Ryoku did that the island
-    does not yet.
+12. ~~**The system tray.**~~ Done: the daemon is a StatusNotifierHost, and
+    the panel draws the items. `just tray` puts a fake item in it.
 13. **Look at the island.** There are three ways, in increasing order of
     how much they tell you:
 
