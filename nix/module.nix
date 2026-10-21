@@ -95,9 +95,9 @@ in {
     sessionTargets = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
-        "niri-session.target"
+        "graphical-session.target"
       ];
-      defaultText = lib.literalExpression "[ \"niri-session.target\" ]";
+      defaultText = lib.literalExpression "[ \"graphical-session.target\" ]";
       description = ''
         Session targets the island starts with.
 
@@ -106,6 +106,25 @@ in {
         never started. Listing a compositor that is not installed therefore
         stops the island from starting at all, rather than doing nothing
         useful. Add the ones that are actually installed.
+
+        `graphical-session.target` is the one that exists on NixOS. The
+        compositor-specific targets some compositors ship do not, and a
+        unit waiting for a target that never activates waits forever.
+      '';
+    };
+
+    compositorService = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        The compositor's systemd user service, if the island should wait for
+        it before starting.
+
+        This matters: the island needs WAYLAND_DISPLAY, and the compositor
+        is what puts it there. Started at the same time as the session, the
+        island can easily win the race and find no display to draw on.
+        Naming the compositor's service makes the island wait for it, and
+        pulls it in if it is not running already.
       '';
     };
 
@@ -147,11 +166,17 @@ in {
       };
     };
 
+    # The compositor has to be up before the island starts, or the island
+    # finds no display to draw on.
+    compositorUnits = lib.optionals (cfg.compositorService != null) [
+      cfg.compositorService
+    ];
+
     systemd.user.services.isled = {
       Unit = {
         Description = "Dynamic Island Shell session daemon";
-        After = ["graphical-session-pre.target"];
-        Wants = ["graphical-session-pre.target"];
+        After = ["graphical-session-pre.target"] ++ compositorUnits;
+        Wants = ["graphical-session-pre.target"] ++ compositorUnits;
       };
       Service = {
         Type = "simple";
@@ -174,7 +199,8 @@ in {
       Unit = {
         Description = "Dynamic Island Shell UI";
         Requires = ["isled.service"];
-        After = ["isled.service"];
+        After = ["isled.service"] ++ compositorUnits;
+        Wants = compositorUnits;
       };
       Service = {
         Type = "simple";
@@ -199,7 +225,8 @@ in {
     systemd.user.services.awww-daemon = lib.mkIf cfg.enableAwww {
       Unit = {
         Description = "awww wallpaper daemon (isle namespace)";
-        After = ["graphical-session-pre.target"];
+        After = ["graphical-session-pre.target"] ++ compositorUnits;
+        Wants = ["graphical-session-pre.target"] ++ compositorUnits;
       };
       Service = {
         Type = "simple";
