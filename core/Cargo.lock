@@ -370,6 +370,7 @@ dependencies = [
 name = "isled"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
  "isle-core",
  "serde",
  "serde_json",

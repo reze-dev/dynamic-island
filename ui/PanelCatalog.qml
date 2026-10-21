@@ -8,6 +8,9 @@ import QtQuick
 // icon, its own height and its own subtitle, because each panel is supposed
 // to feel like its own thing rather than a page in a book.
 QtObject {
+    // The nine panels, and then the tray. The tray is not part of the
+    // numbered sequence: it is reached with its own key, because a system
+    // tray is a different kind of thing from a panel.
     readonly property var names: [
         "context",
         "media",
@@ -17,7 +20,8 @@ QtObject {
         "todos",
         "notes",
         "network",
-        "theme"
+        "theme",
+        "tray"
     ]
 
     readonly property var subtitles: [
@@ -29,7 +33,8 @@ QtObject {
         "time-stamped tasks and a pomodoro",
         "a scratchpad that saves itself",
         "wifi, ethernet, bluetooth, battery",
-        "wallpapers and the palette they bring"
+        "wallpapers and the palette they bring",
+        "the icons the applications left behind"
     ]
 
     readonly property var glyphs: [
@@ -41,7 +46,8 @@ QtObject {
         "check-square",
         "note",
         "wifi",
-        "image"
+        "image",
+        "grid"
     ]
 
     /// How tall each panel wants to be. The island morphs to fit, so a
@@ -55,7 +61,8 @@ QtObject {
         450,
         470,
         420,
-        460
+        460,
+        300
     ]
 
     /// The keybind label for each view.
@@ -68,7 +75,8 @@ QtObject {
         "Mod+Ctrl+6",
         "Mod+Ctrl+7",
         "Mod+Ctrl+8",
-        "Mod+Ctrl+9"
+        "Mod+Ctrl+9",
+        "Mod+Ctrl+T"
     ]
 
     function isValid(index) {

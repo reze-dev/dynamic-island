@@ -78,7 +78,7 @@ echo "# Meeting prep" >"$seed/notes/prep.md"
 export ISLED_SOCKET="$socket"
 export XDG_STATE_HOME="$seed/state"
 
-"$bin" --no-claim-notifications >"$seed/daemon.log" 2>&1 &
+"$bin" --no-claim-notifications --claim-tray >"$seed/daemon.log" 2>&1 &
 daemon_pid=$!
 sleep 1
 
@@ -110,6 +110,14 @@ call clipboard.add '{"text":"git log --oneline -10"}'
 call notes.new '{"title":"Ideas for the island"}'
 call activity.trigger '{"kind":"media","title":"Glasshouse","subtitle":"Aether · Late Night Systems","glyph":"music","sticky":true,"source":"spotify","tone":"info"}'
 
+# A tray item, so the tray panel is photographed with something in it.
+if [ -x "$repo/core/target/debug/examples/fake-tray" ]; then
+    "$repo/core/target/debug/examples/fake-tray" --title "Network" --icon "mpv" \
+        >"$seed/item.log" 2>&1 &
+    echo $! >"$seed/item.pid"
+    sleep 2
+fi
+
 sleep 1
 
 # ---- the pictures ----
@@ -122,3 +130,7 @@ ISLED_PREVIEW_DIR="$out" ISLED_SOCKET="$socket" QT_QPA_PLATFORM=offscreen \
 
 ls -1 "$out"/*.png 2>/dev/null | sed 's|.*/|  |'
 echo "--- written to $out"
+
+if [ -f "$seed/item.pid" ]; then
+    kill "$(cat "$seed/item.pid")" 2>/dev/null || true
+fi

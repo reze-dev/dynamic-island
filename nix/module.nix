@@ -98,6 +98,20 @@ in {
       '';
     };
 
+    claimTray = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Let isled own org.kde.StatusNotifierWatcher, which is what a system
+        tray host is.
+
+        The same care as with the notification name: isled asks for it
+        without queueing, so it refuses the name rather than taking it from
+        whatever already has it. Without it the tray panel says there is no
+        host, which is honest.
+      '';
+    };
+
     sessionTargets = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
@@ -183,6 +197,7 @@ in {
         ExecStart = lib.concatStringsSep " " (
           [(lib.getExe cfg.package)]
           ++ lib.optionals cfg.claimNotifications ["--claim-notifications"]
+          ++ lib.optionals cfg.claimTray ["--claim-tray"]
         );
         Restart = "on-failure";
         RestartSec = 2;

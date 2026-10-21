@@ -49,6 +49,8 @@ QtObject {
     property var wallpapers: null
     property var calendar: null
     property var settings: null
+    /// The system tray's items.
+    property var tray: []
 
     // ---- requests ----
 
@@ -323,6 +325,13 @@ QtObject {
         });
     }
 
+    function reloadTray() {
+        bridge.call("tray.list", {}, function (ok, payload) {
+            if (ok && payload)
+                bridge.tray = payload.items || [];
+        });
+    }
+
     function reloadWallpapers() {
         bridge.call("wallpaper.list", {}, function (ok, payload) {
             if (ok && payload)
@@ -352,6 +361,7 @@ QtObject {
         bridge.reloadWallpapers();
         bridge.reloadCalendar();
         bridge.reloadSettings();
+        bridge.reloadTray();
     }
 
     // ---- lifecycle ----

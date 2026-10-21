@@ -17,16 +17,27 @@ fn resolve_socket_path(env: impl Fn(&str) -> Option<std::ffi::OsString>) -> Path
 }
 
 pub const CLAIM_NOTIFICATIONS_ENV: &str = "ISLED_CLAIM_NOTIFICATIONS";
+pub const CLAIM_TRAY_ENV: &str = "ISLED_CLAIM_TRAY";
+
+/// What the daemon should take over on the session bus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Claims {
+    /// Own `org.freedesktop.Notifications`.
+    pub notifications: bool,
+    /// Own `org.kde.StatusNotifierWatcher`, which is what a system tray
+    /// host is.
+    pub tray: bool,
+}
 
 pub enum Args {
-    Serve(bool),
+    Serve(Claims),
     Call { name: String, raw: String },
-    SocketPath(bool),
+    SocketPath(Claims),
     Help,
     Unknown(String),
 }
 
-pub fn env_wants_notifications(key: &str) -> bool {
+pub fn env_wants(key: &str) -> bool {
     matches!(std::env::var(key), Ok(value) if matches!(
         value.trim().to_ascii_lowercase().as_str(),
         "1" | "true" | "yes" | "on"
@@ -35,15 +46,26 @@ pub fn env_wants_notifications(key: &str) -> bool {
 
 pub fn parse_args<I: IntoIterator<Item = String>>(args: I) -> Args {
     let mut args = args.into_iter().peekable();
-    let mut claim = env_wants_notifications(CLAIM_NOTIFICATIONS_ENV);
+    let mut claims = Claims {
+        notifications: env_wants(CLAIM_NOTIFICATIONS_ENV),
+        tray: env_wants(CLAIM_TRAY_ENV),
+    };
     while let Some(flag) = args.peek().map(|s| s.as_str()) {
         match flag {
             "--claim-notifications" => {
-                claim = true;
+                claims.notifications = true;
                 args.next();
             }
             "--no-claim-notifications" => {
-                claim = false;
+                claims.notifications = false;
+                args.next();
+            }
+            "--claim-tray" => {
+                claims.tray = true;
+                args.next();
+            }
+            "--no-claim-tray" => {
+                claims.tray = false;
                 args.next();
             }
             _ => break,
@@ -55,9 +77,9 @@ pub fn parse_args<I: IntoIterator<Item = String>>(args: I) -> Args {
             let raw = args.next().unwrap_or_default();
             Args::Call { name, raw }
         }
-        Some("socket-path") => Args::SocketPath(claim),
+        Some("socket-path") => Args::SocketPath(claims),
         Some("--help" | "-h") => Args::Help,
-        None => Args::Serve(claim),
+        None => Args::Serve(claims),
         Some(other) => Args::Unknown(other.to_owned()),
     }
 }
@@ -129,24 +151,49 @@ mod tests {
     #[test]
     fn bare_invocation_serves_and_help_recognises_flags() {
         let args = |v: &[&str]| parse_args(v.iter().map(|s| (*s).to_owned()));
-        assert!(matches!(args(&[]), Args::Serve(false)));
+        assert!(matches!(
+            args(&[]),
+            Args::Serve(Claims {
+                notifications: false,
+                tray: false
+            })
+        ));
         assert!(matches!(args(&["--help"]), Args::Help));
         assert!(matches!(args(&["-h"]), Args::Help));
         assert!(matches!(args(&["nonsense"]), Args::Unknown(ref s) if s == "nonsense"));
     }
 
     #[test]
-    fn claiming_the_bus_name_is_opt_in_by_flag() {
+    fn claiming_the_bus_names_is_opt_in_by_flag() {
         let args = |v: &[&str]| parse_args(v.iter().map(|s| (*s).to_owned()));
         assert!(matches!(
             args(&["--claim-notifications"]),
-            Args::Serve(true)
+            Args::Serve(Claims {
+                notifications: true,
+                tray: false
+            })
         ));
         assert!(matches!(
             args(&["--no-claim-notifications"]),
-            Args::Serve(false)
+            Args::Serve(Claims {
+                notifications: false,
+                tray: false
+            })
         ));
-        assert!(matches!(args(&[]), Args::Serve(false)));
+        assert!(matches!(
+            args(&["--claim-tray"]),
+            Args::Serve(Claims {
+                notifications: false,
+                tray: true
+            })
+        ));
+        assert!(matches!(
+            args(&["--claim-notifications", "--claim-tray"]),
+            Args::Serve(Claims {
+                notifications: true,
+                tray: true
+            })
+        ));
     }
 
     #[test]
@@ -154,7 +201,10 @@ mod tests {
         let args = |v: &[&str]| parse_args(v.iter().map(|s| (*s).to_owned()));
         assert!(matches!(
             args(&["--claim-notifications", "socket-path"]),
-            Args::SocketPath(true)
+            Args::SocketPath(Claims {
+                notifications: true,
+                tray: false
+            })
         ));
         assert!(matches!(
             args(&["call", "ping"]),

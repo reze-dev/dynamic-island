@@ -76,4 +76,11 @@ Item {
         enabled: host.view === 8
         bridge: host.bridge
     }
+
+    TrayPanel {
+        anchors.fill: parent
+        visible: host.view === 9
+        enabled: host.view === 9
+        bridge: host.bridge
+    }
 }

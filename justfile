@@ -421,6 +421,20 @@ preview dir="/tmp/isle-preview":
     ls -1 "{{dir}}"/*.png 2>/dev/null | sed 's|.*/|  |'
     echo "--- written to {{dir}}"
 
+# -------------------------------------------------------------- the tray
+
+# A fake tray item, so the tray can be exercised without an application
+# that has one. Needs a daemon running with --claim-tray.
+#
+#   just tray
+#   just tray "Steam" "steam"
+tray title="Fake Item" icon="mpv":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{repo}}/core
+    cargo build --offline --example fake-tray 2>/dev/null
+    ./target/debug/examples/fake-tray --title "{{title}}" --icon "{{icon}}"
+
 # ------------------------------------------------------------ scratch dirs
 
 clean-tmp:

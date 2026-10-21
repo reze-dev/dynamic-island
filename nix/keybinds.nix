@@ -23,7 +23,9 @@
 { lib, isled ? "isled" }:
 
 let
-  # The panels, in the order the island walks them.
+  # The panels, in the order the island walks them. The nine are numbered;
+  # the tray is not, because a system tray is a different kind of thing from
+  # a panel and has its own key.
   panels = [
     "context"
     "media"
@@ -35,6 +37,9 @@ let
     "network"
     "theme"
   ];
+
+  # The system tray, after the nine.
+  trayIndex = 9;
 
   # The command that opens a panel. The index is a bare number rather than
   # JSON, so a compositor config never has to quote anything.
@@ -92,6 +97,17 @@ rec {
             ];
           };
         }
+        {
+          name = "Mod+Ctrl+T";
+          value = {
+            spawn = [
+              isled
+              "call"
+              "view.set"
+              (toString trayIndex)
+            ];
+          };
+        }
       ]
     ]
   );
@@ -112,6 +128,10 @@ rec {
         {
           name = "SUPER CTRL, K";
           value = "${isled} call island.focus";
+        }
+        {
+          name = "SUPER CTRL, T";
+          value = "${isled} call view.set ${toString trayIndex}";
         }
       ]
     ]

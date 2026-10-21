@@ -11,6 +11,7 @@ name = "isled"
 path = "src/main.rs"
 
 [dependencies]
+futures-util = { workspace = true }
 isle-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

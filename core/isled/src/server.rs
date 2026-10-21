@@ -1,9 +1,10 @@
 use crate::domain::Domain;
 use crate::notify::{self, Hub, NotifyRequest};
-use crate::paths::socket_path;
+use crate::paths::{Claims, socket_path};
 use crate::settings::Settings;
 use crate::stats::Sampler;
 use crate::store::Store;
+use crate::tray::{self, Tray};
 use isle_core::live::{Activity, ActivityKind, ActivityTone};
 use isle_core::state::{CloseReason, unix_now, unix_now_ms};
 use isle_core::{ClientMessage, ServerMessage, Session, Snapshot, SystemStats};
@@ -26,6 +27,10 @@ pub struct Server {
     events: Events,
     notifications: Arc<Hub>,
     claim_notifications: bool,
+    claim_tray: bool,
+    /// The system tray. It is a host rather than an item, so it exists even
+    /// when the bus name is not claimed: the panel can still say so.
+    tray: Tray,
     shutdown: tokio::sync::Notify,
     domain: tokio::sync::Mutex<Domain>,
     /// Whether NetworkManager is on the bus. Worked out once, on the first
@@ -34,29 +39,31 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(claim_notifications: bool) -> Arc<Self> {
-        Self::with_socket_and_hub(socket_path(), claim_notifications)
+    pub fn new(claims: Claims) -> Arc<Self> {
+        Self::with_socket_and_hub(socket_path(), claims)
     }
 
-    pub fn with_socket_and_hub(socket: PathBuf, claim_notifications: bool) -> Arc<Self> {
-        Self::with_domain(socket, claim_notifications, Domain::load(Store::new()))
+    pub fn with_socket_and_hub(socket: PathBuf, claims: Claims) -> Arc<Self> {
+        Self::with_domain(socket, claims, Domain::load(Store::new()))
     }
 
     /// Build a server around an explicit domain. The tests use this so they
     /// never touch the real `~/.local/state/isled`.
-    pub fn with_domain(socket: PathBuf, claim_notifications: bool, domain: Domain) -> Arc<Self> {
+    pub fn with_domain(socket: PathBuf, claims: Claims, domain: Domain) -> Arc<Self> {
         let (events, _) = broadcast::channel(EVENT_BUFFER);
         let hub = Hub::detached(events.clone());
-        if claim_notifications {
+        if claims.notifications {
             notify::spawn_expiry_sweep(Arc::clone(&hub));
         }
         Arc::new(Self {
             socket,
             snapshot: snapshot(),
             stats: tokio::sync::Mutex::new(Sampler::new()),
-            events,
+            events: events.clone(),
             notifications: hub,
-            claim_notifications,
+            claim_notifications: claims.notifications,
+            claim_tray: claims.tray,
+            tray: Tray::new(events),
             shutdown: tokio::sync::Notify::new(),
             domain: tokio::sync::Mutex::new(domain),
             network_manager: tokio::sync::OnceCell::new(),
@@ -110,6 +117,20 @@ impl Server {
                     %err,
                     "could not claim {}; continuing without the bus name",
                     notify::NOTIFICATIONS_BUS_NAME
+                ),
+            }
+        }
+
+        if self.claim_tray {
+            match tray::claim(self.tray.clone()).await {
+                Ok((_connection, tray)) => {
+                    tracing::info!("the system tray is being served by this daemon");
+                    tokio::spawn(async move { tray::watch(tray).await });
+                }
+                Err(err) => tracing::warn!(
+                    %err,
+                    "could not claim {}; the tray will not be served",
+                    "org.kde.StatusNotifierWatcher"
                 ),
             }
         }
@@ -1073,6 +1094,41 @@ impl Server {
                     None => ServerMessage::reply_err(id, "could not read the clipboard"),
                 }
             }
+            "tray.list" => {
+                let items = self.tray.items().await;
+                let payload: Vec<serde_json::Value> = items.iter().map(|i| i.payload()).collect();
+                ServerMessage::reply_with(id, serde_json::json!({ "items": payload }))
+            }
+            "tray.activate" => {
+                let service = arg_string(args.get("service"), "");
+                let x = args
+                    .get("x")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0) as i32;
+                let y = args
+                    .get("y")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0) as i32;
+                match tray::activate(&service, x, y).await {
+                    Ok(()) => ServerMessage::reply_ok(id),
+                    Err(err) => ServerMessage::reply_err(id, err),
+                }
+            }
+            "tray.secondary" => {
+                let service = arg_string(args.get("service"), "");
+                let x = args
+                    .get("x")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0) as i32;
+                let y = args
+                    .get("y")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0) as i32;
+                match tray::secondary_activate(&service, x, y).await {
+                    Ok(()) => ServerMessage::reply_ok(id),
+                    Err(err) => ServerMessage::reply_err(id, err),
+                }
+            }
             "network.wifi" => {
                 let enabled = args
                     .get("enabled")
@@ -1576,7 +1632,11 @@ mod tests {
         let dir = scratch(name);
         let _ = std::fs::remove_dir_all(&dir);
         let store = Store::rooted_at(dir.join("state"), dir.join("data"));
-        Server::with_domain(dir.join("isled.sock"), false, Domain::load(store))
+        Server::with_domain(
+            dir.join("isled.sock"),
+            Claims::default(),
+            Domain::load(store),
+        )
     }
 
     async fn call(server: &Server, name: &str, args: serde_json::Value) -> ServerMessage {
@@ -1728,7 +1788,11 @@ mod tests {
         let dir = scratch("handshake");
         let _ = std::fs::remove_dir_all(&dir);
         let store = Store::rooted_at(dir.join("state"), dir.join("data"));
-        let server = Server::with_domain(dir.join("isled.sock"), false, Domain::load(store));
+        let server = Server::with_domain(
+            dir.join("isled.sock"),
+            Claims::default(),
+            Domain::load(store),
+        );
         let path = server.socket().to_path_buf();
 
         let serving = tokio::spawn({
@@ -1768,7 +1832,11 @@ mod tests {
         let dir = scratch("cleanup");
         let _ = std::fs::remove_dir_all(&dir);
         let store = Store::rooted_at(dir.join("state"), dir.join("data"));
-        let server = Server::with_domain(dir.join("isled.sock"), false, Domain::load(store));
+        let server = Server::with_domain(
+            dir.join("isled.sock"),
+            Claims::default(),
+            Domain::load(store),
+        );
         let path = server.socket().to_path_buf();
 
         let serving = tokio::spawn({
@@ -1797,7 +1865,11 @@ mod tests {
         let dir = scratch("events");
         let _ = std::fs::remove_dir_all(&dir);
         let store = Store::rooted_at(dir.join("state"), dir.join("data"));
-        let server = Server::with_domain(dir.join("isled.sock"), false, Domain::load(store));
+        let server = Server::with_domain(
+            dir.join("isled.sock"),
+            Claims::default(),
+            Domain::load(store),
+        );
         let path = server.socket().to_path_buf();
 
         let serving = tokio::spawn({

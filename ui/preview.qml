@@ -179,6 +179,14 @@ ShellRoot {
             "ambient": null,
             "trigger": null,
             "view": 8
+        },
+        {
+            "name": "full-tray",
+            "mode": "full",
+            "hovered": false,
+            "ambient": null,
+            "trigger": null,
+            "view": 9
         }
     ]
 

@@ -8,6 +8,8 @@ mod clipwatch;
 mod data;
 mod domain;
 #[allow(dead_code)]
+mod icons;
+#[allow(dead_code)]
 mod ics;
 mod network;
 mod notify;
@@ -17,6 +19,7 @@ mod settings;
 mod stats;
 #[allow(dead_code)]
 mod store;
+mod tray;
 #[allow(dead_code)]
 mod tz;
 mod wallpaper;
@@ -45,22 +48,20 @@ async fn main() -> ExitCode {
         .init();
 
     match parse_args(std::env::args().skip(1)) {
-        Args::Serve(claim_notifications) => {
-            match tokio::spawn(server::Server::new(claim_notifications).serve()).await {
-                Ok(Ok(())) => ExitCode::SUCCESS,
-                Ok(Err(err)) => {
-                    tracing::error!(%err, "server failed");
-                    ExitCode::FAILURE
-                }
-                Err(err) => {
-                    tracing::error!(%err, "server task panicked");
-                    ExitCode::FAILURE
-                }
+        Args::Serve(claims) => match tokio::spawn(server::Server::new(claims).serve()).await {
+            Ok(Ok(())) => ExitCode::SUCCESS,
+            Ok(Err(err)) => {
+                tracing::error!(%err, "server failed");
+                ExitCode::FAILURE
             }
-        }
+            Err(err) => {
+                tracing::error!(%err, "server task panicked");
+                ExitCode::FAILURE
+            }
+        },
         Args::Call { name, raw } => call(&name, &raw).await,
-        Args::SocketPath(claim_notifications) => {
-            if claim_notifications {
+        Args::SocketPath(claims) => {
+            if claims.notifications || claims.tray {
                 // the socket path does not depend on the bus name, but accepting the flag here
                 // keeps `isled --claim-notifications socket-path` from failing as "unknown"
             }
