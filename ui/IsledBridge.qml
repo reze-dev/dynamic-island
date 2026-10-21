@@ -23,6 +23,9 @@ QtObject {
         : (runtimeDir ? runtimeDir + "/isled/isled.sock" : "/tmp/isled/isled.sock")
 
     property bool connected: false
+    /// Whether to reach for the daemon on startup. The preview rig turns it
+    /// off when it is only photographing the island.
+    property bool autoConnect: true
     property string lastError: ""
     property string lastTopic: ""
 
@@ -392,6 +395,7 @@ QtObject {
     }
 
     Component.onCompleted: {
-        bridge.socket.connected = true;
+        if (bridge.autoConnect)
+            bridge.socket.connected = true;
     }
 }

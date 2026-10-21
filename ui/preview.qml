@@ -20,7 +20,17 @@ ShellRoot {
     id: root
 
     property int index: 0
-    property string output: "/tmp/isle-preview"
+    readonly property string output: Quickshell.env("ISLED_PREVIEW_DIR")
+        ? Quickshell.env("ISLED_PREVIEW_DIR")
+        : "/tmp/isle-preview"
+
+    // When ISLED_SOCKET points at a running daemon, the rig connects to it
+    // and the panels are photographed with real data in them. An empty
+    // panel is a forgiving thing: it hides every layout fault there is.
+    readonly property bool live: Quickshell.env("ISLED_SOCKET") !== ""
+    property IsledBridge bridge: IsledBridge {
+        autoConnect: root.live
+    }
 
     /// The appearances worth photographing, in the order they happen.
     property var scenarios: [
@@ -183,16 +193,27 @@ ShellRoot {
             ambient: root.scenarios[root.index].ambient
             trigger: root.scenarios[root.index].trigger
             view: root.scenarios[root.index].view
+            bridge: root.bridge
         }
     }
 
     // The island takes 380ms to change shape and 200ms to cross-fade, so
     // each scenario has to settle before it is photographed.
+    // The daemon has to be asked for everything before the first picture,
+    // or the panels are photographed empty.
     Timer {
         interval: 1100
-        running: true
+        running: root.warm
         repeat: true
         onTriggered: root.shoot()
+    }
+
+    property bool warm: false
+    Timer {
+        interval: 2500
+        running: true
+        repeat: false
+        onTriggered: root.warm = true
     }
 
     function shoot() {

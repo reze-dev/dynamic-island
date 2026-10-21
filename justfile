@@ -370,6 +370,15 @@ trigger what="notification":
         ;;
     esac
 
+# The preview with real data in it: a daemon on a scratch socket, seeded with
+# wallpapers, a calendar, notes, todos and notifications, and then every
+# panel photographed with something in it. An empty panel is a forgiving
+# thing — it hides every layout fault there is.
+preview-live:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    {{repo}}/tools/preview-live.sh
+
 # The morph, as a GIF. Renders the island headless, photographs it while the
 # animations run, and assembles the frames. The one thing a screenshot
 # cannot show.

@@ -1177,7 +1177,19 @@ impl Server {
                 let value = args.get("value").cloned().unwrap_or_default();
                 {
                     let mut domain = self.domain.lock().await;
+                    let before = domain.settings.clone();
                     apply_setting(&mut domain.settings, &key, &value);
+                    // A directory that changed has to be re-pointed at, not
+                    // just remembered: the note store and the wallpaper
+                    // catalog are separate from the settings themselves.
+                    if domain.settings.notes_dir != before.notes_dir {
+                        let dir = domain.settings.notes_dir();
+                        domain.set_notes_dir(dir);
+                    }
+                    if domain.settings.wallpaper_dir != before.wallpaper_dir {
+                        let dir = domain.settings.wallpaper_dir();
+                        domain.set_wallpaper_dir(dir);
+                    }
                     domain.save_settings();
                 }
                 let _ = self.events.send(ServerMessage::event(
@@ -1811,6 +1823,61 @@ mod tests {
         assert_eq!(data["ambient"]["title"], "Song");
         assert!(data["todos"].is_array());
         assert!(data["timer"].is_object());
+    }
+
+    #[tokio::test]
+    async fn changing_the_notes_directory_repoints_the_note_store() {
+        // The settings and the note store are separate things. A directory
+        // that has been changed has to be re-pointed at, not just remembered.
+        let server = server("settings-notes");
+        let dir = scratch("notes-dir");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("note.md"), "# A note\n\nthe body\n").unwrap();
+
+        call(
+            &server,
+            "settings.set",
+            serde_json::json!({ "key": "notes_dir", "value": dir.to_string_lossy() }),
+        )
+        .await;
+
+        let listed = call(&server, "notes.list", serde_json::Value::Null).await;
+        let ServerMessage::Reply {
+            data: Some(data), ..
+        } = listed
+        else {
+            panic!("expected a reply with data");
+        };
+        let items = data["items"].as_array().unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0]["title"], "A note");
+        assert_eq!(data["dir"].as_str(), Some(dir.to_string_lossy().as_ref()));
+    }
+
+    #[tokio::test]
+    async fn changing_the_wallpaper_directory_rescans_the_catalog() {
+        let server = server("settings-walls");
+        let dir = scratch("walls-dir");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("a.png"), b"x").unwrap();
+
+        call(
+            &server,
+            "settings.set",
+            serde_json::json!({ "key": "wallpaper_dir", "value": dir.to_string_lossy() }),
+        )
+        .await;
+
+        let listed = call(&server, "wallpaper.list", serde_json::Value::Null).await;
+        let ServerMessage::Reply {
+            data: Some(data), ..
+        } = listed
+        else {
+            panic!("expected a reply with data");
+        };
+        assert_eq!(data["items"].as_array().unwrap().len(), 1);
     }
 
     #[tokio::test]

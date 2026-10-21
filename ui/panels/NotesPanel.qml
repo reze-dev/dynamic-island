@@ -148,7 +148,8 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: Theme.spacing
-        anchors.bottomMargin: Theme.spacing
+        // The footer lives below the editor, not on top of it.
+        anchors.bottomMargin: Theme.spacing + 24
         color: Theme.well
         radius: Theme.radiusCard
         border.width: 1
@@ -217,15 +218,20 @@ Item {
         }
     }
 
-    // The footer: save state, and the way into Obsidian.
+    // The footer: the save state, the directory, and the two buttons. It is
+    // a row of its own so that nothing can end up underneath the buttons.
     Row {
+        id: footer
         anchors.left: parent.left
         anchors.leftMargin: parent.width * 0.4
+        anchors.right: newNoteButton.left
+        anchors.rightMargin: Theme.spacingTight
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Theme.spacingTight
         spacing: Theme.spacingTight
 
         Text {
+            id: saveState
             anchors.verticalCenter: parent.verticalCenter
             text: panel.dirty ? "UNSAVED" : (panel.selected ? "SAVED" : "")
             color: panel.dirty ? Theme.toneWarn : Theme.textFaint
@@ -237,29 +243,20 @@ Item {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
+            // Whatever the buttons and the save state have not claimed.
+            width: Math.max(0, footer.width - saveState.width - footer.spacing)
             text: panel.directory
             color: Theme.textFaint
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontTiny
             elide: Text.ElideLeft
-            width: 220
         }
     }
 
     IconButton {
+        id: obsidianButton
         anchors.right: parent.right
-        anchors.rightMargin: Theme.spacing
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: Theme.spacingTight
-        icon: "plus"
-        size: 28
-        tooltip: "New note"
-        onClicked: panel.newNote()
-    }
-
-    IconButton {
-        anchors.right: parent.right
-        anchors.rightMargin: Theme.spacing + 34
+        anchors.rightMargin: Theme.spacing + 32
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Theme.spacingTight
         icon: "external"
@@ -274,5 +271,17 @@ Item {
                     Qt.openUrlExternally(payload.uri);
             });
         }
+    }
+
+    IconButton {
+        id: newNoteButton
+        anchors.right: parent.right
+        anchors.rightMargin: Theme.spacing
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Theme.spacingTight
+        icon: "plus"
+        size: 28
+        tooltip: "New note"
+        onClicked: panel.newNote()
     }
 }

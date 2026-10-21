@@ -223,12 +223,14 @@ Item {
             radius: Theme.radiusSmall
 
             Row {
+                id: clipRow
                 anchors.fill: parent
                 anchors.leftMargin: Theme.spacingTight + 2
                 anchors.rightMargin: Theme.spacingTight
                 spacing: Theme.spacingTight
 
                 Chip {
+                    id: kindChip
                     anchors.verticalCenter: parent.verticalCenter
                     text: entry.modelData.kind ? entry.modelData.kind.toUpperCase() : "TEXT"
                     tone: entry.modelData.kind === "url"
@@ -238,7 +240,10 @@ Item {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(0, parent.width - 190)
+                    // Everything the row does not need for itself.
+                    width: Math.max(0, clipRow.width - kindChip.width
+                        - ageText.width - pinButton.width - copyButton.width
+                        - trashButton.width - clipRow.spacing * 5)
                     text: entry.modelData.text
                     color: Theme.text
                     font.family: Theme.fontFamily
@@ -247,6 +252,7 @@ Item {
                 }
 
                 Text {
+                    id: ageText
                     anchors.verticalCenter: parent.verticalCenter
                     text: Format.ago(entry.modelData.created_at_unix)
                     color: Theme.textFaint
@@ -255,6 +261,7 @@ Item {
                 }
 
                 IconButton {
+                    id: pinButton
                     anchors.verticalCenter: parent.verticalCenter
                     icon: "pin"
                     size: 22
@@ -269,6 +276,7 @@ Item {
                 }
 
                 IconButton {
+                    id: copyButton
                     anchors.verticalCenter: parent.verticalCenter
                     icon: "copy"
                     size: 22
@@ -279,6 +287,7 @@ Item {
                 }
 
                 IconButton {
+                    id: trashButton
                     anchors.verticalCenter: parent.verticalCenter
                     icon: "trash"
                     size: 22

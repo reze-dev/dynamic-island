@@ -75,11 +75,13 @@ Item {
         height: 44
 
         Row {
+            id: wifiRow
             anchors.fill: parent
             anchors.margins: Theme.spacingTight + 2
             spacing: Theme.spacingTight + 2
 
             Icon {
+                id: wifiIcon
                 anchors.verticalCenter: parent.verticalCenter
                 name: "wifi"
                 width: 16
@@ -89,7 +91,10 @@ Item {
 
             Column {
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 80
+                // What the icon and the switch have not claimed, so the
+                // switch sits at the right edge of the card.
+                width: Math.max(0, wifiRow.width - wifiIcon.width
+                    - wifiToggle.width - wifiRow.spacing * 2)
                 spacing: 1
 
                 Text {
@@ -113,6 +118,7 @@ Item {
             }
 
             Toggle {
+                id: wifiToggle
                 anchors.verticalCenter: parent.verticalCenter
                 checked: Networking.wifiEnabled
                 onToggled: function (value) {

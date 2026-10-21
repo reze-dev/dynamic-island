@@ -219,21 +219,49 @@ Item {
         panel.dirEditing = false;
     }
 
-    // The grid.
-    Grid {
-        id: grid
+    // The grid. It has to scroll: a directory of wallpapers is usually bigger
+    // than the panel, and a grid that only shows the first eight is a grid
+    // with a wall of nothing at the bottom.
+    Flickable {
+        id: scroller
         anchors.top: dirCard.bottom
         anchors.topMargin: Theme.spacing
         anchors.left: parent.left
         anchors.right: parent.right
+        anchors.bottom: parent.bottom
         anchors.leftMargin: Theme.spacing
         anchors.rightMargin: Theme.spacing
-        anchors.bottom: parent.bottom
         anchors.bottomMargin: Theme.spacing
-        columns: 4
-        columnSpacing: Theme.spacingTight
-        rowSpacing: Theme.spacingTight
+        contentWidth: width
+        contentHeight: grid.height
         clip: true
+        boundsBehavior: Flickable.StopAtBounds
+
+        // A scroll indicator, because QtQuick.Controls is not available and
+        // there is no other way to say there is more below.
+        Rectangle {
+            anchors.right: parent.right
+            anchors.rightMargin: -Theme.spacingTight
+            width: 3
+            radius: 1.5
+            color: Theme.textFaint
+            opacity: scroller.moving || scroller.atYBeginning ? 0 : 0.5
+            height: Math.max(24, scroller.height * (scroller.height / Math.max(1, scroller.contentHeight)))
+            y: scroller.contentY * (scroller.height / Math.max(1, scroller.contentHeight))
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Theme.crossfadeDuration
+                }
+            }
+        }
+
+        Grid {
+            id: grid
+            width: scroller.width
+            columns: 4
+            columnSpacing: Theme.spacingTight
+            rowSpacing: Theme.spacingTight
 
         Repeater {
             model: panel.items
@@ -314,9 +342,10 @@ Item {
             }
         }
     }
+    }
 
     Text {
-        anchors.centerIn: grid
+        anchors.centerIn: scroller
         visible: panel.items.length === 0
         text: "No images in that directory."
         color: Theme.textFaint

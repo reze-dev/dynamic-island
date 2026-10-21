@@ -123,11 +123,12 @@ Item {
                         required property var modelData
                         required property int index
 
-                        width: panel.width
+                        width: parent.width
                         height: 40
                         radius: Theme.radiusSmall
 
                         Row {
+                            id: activityRow
                             anchors.left: parent.left
                             anchors.leftMargin: Theme.spacingTight + 2
                             anchors.right: parent.right
@@ -136,6 +137,7 @@ Item {
                             spacing: Theme.spacingTight + 2
 
                             Rectangle {
+                                id: activityDot
                                 width: 6
                                 height: 6
                                 radius: 3
@@ -144,6 +146,7 @@ Item {
                             }
 
                             Icon {
+                                id: activityIcon
                                 anchors.verticalCenter: parent.verticalCenter
                                 name: modelData.glyph ? modelData.glyph : "spark"
                                 width: 14
@@ -152,8 +155,14 @@ Item {
                             }
 
                             Text {
+                                id: activityTitle
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: Math.max(0, parent.width - 120)
+                                // The title takes what the subtitle has not
+                                // claimed, so the row cannot overflow the card
+                                // and clip the subtitle at the edge.
+                                width: Math.max(0, activityRow.width
+                                    - activityDot.width - activityIcon.width
+                                    - activitySubtitle.width - activityRow.spacing * 3)
                                 text: modelData.title ? modelData.title : ""
                                 color: Theme.text
                                 font.family: Theme.fontFamily
@@ -163,13 +172,14 @@ Item {
                             }
 
                             Text {
+                                id: activitySubtitle
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: modelData.subtitle ? modelData.subtitle : ""
                                 color: Theme.textFaint
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontTiny
                                 elide: Text.ElideRight
-                                width: Math.min(implicitWidth, 120)
+                                width: Math.min(implicitWidth, activityRow.width * 0.4)
                             }
                         }
                     }

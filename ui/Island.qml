@@ -177,33 +177,6 @@ Rectangle {
         onTriggered: island.clearTrigger()
     }
 
-    // ---- the dot ----
-
-    Rectangle {
-        id: dot
-        width: 7
-        height: 7
-        radius: 3.5
-        color: Theme.toneColor(island.dotTone)
-        visible: island.displayState !== "full"
-
-        Behavior on color {
-            ColorAnimation {
-                duration: Theme.crossfadeDuration
-            }
-        }
-
-        // A soft halo, so the dot reads as a light rather than a pixel.
-        Rectangle {
-            anchors.centerIn: parent
-            width: parent.width * 2.6
-            height: parent.height * 2.6
-            radius: height / 2
-            color: dot.color
-            opacity: 0.16
-        }
-    }
-
     // ---- idle: a dot and the clock ----
 
     Item {
@@ -370,9 +343,12 @@ Rectangle {
         Row {
             id: triggerRow
             anchors.left: parent.left
-            anchors.leftMargin: Theme.spacing
+            // The triggered state is a pill, so its corners are round, and
+            // the badge has to clear the arc or it is clipped by it. The
+            // margin is the radius of the pill.
+            anchors.leftMargin: Math.round(Theme.triggeredHeight / 2)
             anchors.right: parent.right
-            anchors.rightMargin: Theme.spacing
+            anchors.rightMargin: Math.round(Theme.triggeredHeight / 2)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.spacingTight + 2
 

@@ -100,6 +100,7 @@ Item {
             radius: Theme.radiusSmall
 
             Row {
+                id: todoRow
                 anchors.fill: parent
                 anchors.leftMargin: Theme.spacingTight + 2
                 anchors.rightMargin: Theme.spacingTight
@@ -107,6 +108,7 @@ Item {
 
                 // The tick box.
                 Rectangle {
+                    id: tickBox
                     anchors.verticalCenter: parent.verticalCenter
                     width: 17
                     height: 17
@@ -138,7 +140,11 @@ Item {
 
                 Column {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(0, parent.width - 120)
+                    // Whatever is left once the tick box and the button have
+                    // had their share. A fixed number here would leave the
+                    // button floating in the middle of the row.
+                    width: Math.max(0, todoRow.width - tickBox.width
+                        - removeButton.width - todoRow.spacing * 2)
                     spacing: 1
 
                     Text {
@@ -166,6 +172,7 @@ Item {
                 }
 
                 IconButton {
+                    id: removeButton
                     anchors.verticalCenter: parent.verticalCenter
                     icon: "trash"
                     size: 22

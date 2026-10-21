@@ -134,6 +134,7 @@ Item {
                 spacing: Theme.spacingTight + 2
 
                 Rectangle {
+                    id: noticeIcon
                     width: 26
                     height: 26
                     radius: 8
@@ -152,7 +153,11 @@ Item {
                 }
 
                 Column {
-                    width: Math.max(0, parent.width - 130)
+                    // What is left once the icon and the dismiss link have
+                    // had their share, so the link sits at the right edge
+                    // instead of floating in the middle of the row.
+                    width: Math.max(0, row.width - noticeIcon.width
+                        - dismissText.width - row.spacing * 2)
                     spacing: 2
 
                     Row {
@@ -225,6 +230,7 @@ Item {
                 }
 
                 Text {
+                    id: dismissText
                     anchors.verticalCenter: parent.verticalCenter
                     text: "dismiss"
                     color: dismissArea.containsMouse ? Theme.text : Theme.textFaint
