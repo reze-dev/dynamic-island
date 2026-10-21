@@ -132,6 +132,12 @@ in {
   config = lib.mkIf cfg.enable {
     xdg.configFile."quickshell/${quickshellConfigName}".source = cfg.uiPath;
 
+    # The daemon is also a command. The keybinds run `isled call ...` and
+    # the plan wants the same commands to work from a terminal, and neither
+    # works if the binary is only in the nix store: the service finds it
+    # by its full path, but everything else finds it on the PATH.
+    home.packages = [ cfg.package ];
+
     systemd.user.targets.isle = {
       Unit = {
         Description = "Dynamic Island Shell session";
