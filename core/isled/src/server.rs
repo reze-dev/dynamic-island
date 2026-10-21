@@ -123,6 +123,17 @@ impl Server {
         let watcher = Arc::clone(&self);
         tokio::spawn(async move { watcher.watch_notifications().await });
 
+        // The clipboard history fills itself up, if there is a way to watch
+        // the clipboard.
+        if let Some(mut selections) = crate::clipwatch::spawn(crate::clipwatch::watch_dir()) {
+            let watcher = Arc::clone(&self);
+            tokio::spawn(async move {
+                while let Some(text) = selections.recv().await {
+                    watcher.record_clipboard(text).await;
+                }
+            });
+        }
+
         let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
             .expect("SIGTERM handler is always constructible");
 
@@ -287,6 +298,26 @@ impl Server {
         if activities_changed {
             self.broadcast_activity_state().await;
         }
+    }
+
+    /// Put a selection that arrived on the clipboard into the history.
+    async fn record_clipboard(&self, text: String) {
+        let added = {
+            let mut domain = self.domain.lock().await;
+            let added = domain.clipboard.push(&text, unix_now());
+            if added.is_some() {
+                domain.save_clipboard();
+            }
+            added
+        };
+        let Some(id) = added else {
+            return;
+        };
+        tracing::debug!(%id, "the clipboard changed");
+        let _ = self.events.send(ServerMessage::event(
+            "clipboard.changed",
+            serde_json::json!({ "id": id }),
+        ));
     }
 
     /// React to notifications arriving on the bus by turning them into

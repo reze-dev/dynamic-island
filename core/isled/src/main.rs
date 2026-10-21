@@ -4,6 +4,7 @@
 // audience, and the tests below exercise the parts the daemon does not call
 // directly yet. Dead code is therefore expected here and is not a smell.
 #[allow(dead_code)]
+mod clipwatch;
 mod data;
 mod domain;
 #[allow(dead_code)]
