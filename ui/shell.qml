@@ -76,12 +76,14 @@ PanelWindow {
         radius: island.radius
     }
 
-    // The top bar: what the machine is called, and what time it is.
+    // The clock, in the corner.
     //
-    // The mock draws these straight onto the page, which works because the
-    // page is black. The shell floats over whatever is on the screen, so
-    // they get a plate of their own: a small piece of glass that reads
-    // against a bright wallpaper as well as a dark one.
+    // The mock draws a system bar across the top of its page: the brand on
+    // the left, the clock on the right. The page is black, so it can. The
+    // shell floats over whatever is really on the screen, and a brand
+    // plate in the corner of somebody's desktop is a foreign object — the
+    // mock's page header is not the desktop's header. The clock is worth
+    // keeping: the island's own clock goes away when a panel opens.
     Item {
         id: bar
         anchors.top: parent.top
@@ -89,43 +91,6 @@ PanelWindow {
         anchors.right: parent.right
         anchors.topMargin: 14
         height: 28
-
-        Rectangle {
-            id: brandPlate
-            anchors.left: parent.left
-            anchors.leftMargin: 25
-            anchors.verticalCenter: parent.verticalCenter
-            width: brandRow.width + 24
-            height: 28
-            radius: height / 2
-            color: Theme.glass
-            border.width: 1
-            border.color: Theme.hairline
-
-            Row {
-                id: brandRow
-                anchors.centerIn: parent
-                spacing: 8
-
-                Rectangle {
-                    width: 8
-                    height: 8
-                    radius: 4
-                    color: Theme.primary
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "ctOS"
-                    color: Theme.onSurfaceVariant
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.type.labelMedium.size
-                    font.weight: Theme.type.labelMedium.weight
-                    font.letterSpacing: Theme.overlineTracking
-                }
-            }
-        }
 
         Rectangle {
             id: clockPlate
