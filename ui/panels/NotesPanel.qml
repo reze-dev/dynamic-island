@@ -13,8 +13,13 @@ Item {
 
     property var bridge: null
     property string selectedId: ""
-    property string draft: ""
     property bool dirty: false
+
+    /// The text being edited. It lives in the field: a binding on the
+    /// field's text breaks the first time it is typed into, and after that
+    /// the field and the panel drift apart — picking another note would
+    /// change the title and leave the body of the last one on screen.
+    readonly property string draft: bodyField.text
 
     readonly property var notes: bridge && bridge.notes ? bridge.notes : []
     readonly property var selected: {
@@ -31,7 +36,7 @@ Item {
         if (panel.dirty && panel.selected)
             panel.save();
         panel.selectedId = note.id;
-        panel.draft = note.body ? note.body : "";
+        bodyField.text = note.body ? note.body : "";
         panel.dirty = false;
     }
 
@@ -39,12 +44,12 @@ Item {
     function selectFirst() {
         if (panel.notes.length === 0) {
             panel.selectedId = "";
-            panel.draft = "";
+            bodyField.text = "";
             panel.dirty = false;
             return;
         }
         panel.selectedId = panel.notes[0].id;
-        panel.draft = panel.notes[0].body ? panel.notes[0].body : "";
+        bodyField.text = panel.notes[0].body ? panel.notes[0].body : "";
         panel.dirty = false;
     }
 
@@ -88,7 +93,7 @@ Item {
         panel.bridge.call("notes.new", { "title": "Untitled" }, function (ok, payload) {
             if (ok && payload && payload.id) {
                 panel.selectedId = payload.id;
-                panel.draft = "";
+                bodyField.text = "";
                 panel.dirty = false;
             }
         });
@@ -239,13 +244,7 @@ Item {
             selectByMouse: true
             selectionColor: Theme.primary
             clip: true
-            text: panel.draft
-            onTextChanged: {
-                if (text !== panel.draft) {
-                    panel.draft = text;
-                    panel.dirty = true;
-                }
-            }
+            onTextEdited: panel.dirty = true
             onAccepted: panel.save()
         }
 

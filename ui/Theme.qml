@@ -91,7 +91,12 @@ QtObject {
 
     /// The island's own skin. Nearly, but not entirely, opaque: the
     /// wallpaper should just about show through the expanded panel.
-    readonly property color glass: Qt.rgba(0.078, 0.078, 0.078, 0.88)
+    /// The glass of the open panel: a dark tint over the compositor's
+    /// blur. The mock uses .88, which is right when the backdrop is its
+    /// own black page and the blur is only there to keep the text behind
+    /// from being noisy. This one floats over whatever is on the screen,
+    /// so it lets a little more through and the blur reads as glass.
+    readonly property color glass: Qt.rgba(0.078, 0.078, 0.078, 0.82)
     /// The idle pill is solid. It is meant to read as a hole in the screen.
     readonly property color islandSurface: Qt.rgba(0, 0, 0, 0.96)
 

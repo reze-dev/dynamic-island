@@ -98,8 +98,17 @@ Item {
 
                 onAccepted: root.accepted()
                 Keys.onEscapePressed: (event) => {
-                    root.escapePressed();
-                    event.accepted = true;
+                    // Esc clears the field, and only lets go of the keyboard
+                    // when there is nothing left to clear. A field that
+                    // swallowed every Esc would keep the island open for
+                    // good: the island closes on Esc, and the key never
+                    // reached it.
+                    if (input.text !== "") {
+                        root.escapePressed();
+                        event.accepted = true;
+                    } else {
+                        input.focus = false;
+                    }
                 }
             }
 

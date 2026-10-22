@@ -18,7 +18,33 @@ PanelWindow {
     color: "transparent"
 
     exclusionMode: ExclusionMode.Ignore
-    focusable: IslandSettings.keyboardFocus
+
+    // The keyboard belongs to the island only while a panel is open.
+    //
+    // Niri hands the keyboard to a newly mapped on-demand layer surface, so
+    // a surface that is focusable from the start takes the keyboard away
+    // from the terminal at login and holds it until something else is
+    // clicked. A notification that opens a panel must not do that either:
+    // the keyboard has to stay where the reader left it.
+    focusable: IslandSettings.keyboardFocus && island.mode === "full"
+
+    // The clickthrough mask. The surface is as wide as the screen and as
+    // tall as the tallest panel, so without a mask every click in that
+    // corner of the screen belongs to the island instead of to the window
+    // underneath it. It also keeps the keyboard: niri gives the keyboard
+    // back to whatever was clicked, so a click that lands on the window
+    // below is what returns it.
+    mask: Region {
+        regions: [
+            Region {
+                item: island
+                radius: island.radius
+            },
+            Region {
+                item: snackbar
+            }
+        ]
+    }
 
     property int view: 0
     readonly property int viewCount: PanelCatalog.names.length
@@ -170,6 +196,15 @@ PanelWindow {
 
     function notify(message, action) {
         snackbar.open(message, action);
+    }
+
+    // The island asks for the keyboard when the panel opens. The click
+    // that opened it arrived before the window was focusable, so the
+    // request in the island's own click handler went nowhere; this one
+    // comes after, and it is what makes Esc reach the island at all.
+    onFocusableChanged: {
+        if (root.focusable)
+            island.forceActiveFocus();
     }
 
     // ---- routing ----

@@ -11,7 +11,6 @@ Item {
     id: panel
 
     property var bridge: null
-    property string draft: ""
 
     readonly property var todos: bridge && bridge.todos ? bridge.todos : []
     readonly property var timer: bridge && bridge.timer ? bridge.timer : null
@@ -52,7 +51,7 @@ Item {
     }
 
     function addTodo() {
-        var raw = panel.draft.trim();
+        var raw = draftField.text.trim();
         if (raw === "")
             return;
         var parts = panel.splitDeadline(raw);
@@ -61,7 +60,7 @@ Item {
             args["due_in_minutes"] = parts.minutes;
         if (panel.bridge)
             panel.bridge.callAndSay("todos.add", args, "Added to the list");
-        panel.draft = "";
+        draftField.text = "";
     }
 
     // ---- the list ----
@@ -84,7 +83,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.rightMargin: parent.width * 0.42
-        anchors.bottom: entryField.top
+        anchors.bottom: draftField.top
         anchors.bottomMargin: Theme.spacingTight
         anchors.leftMargin: Theme.spacing
         clip: true
@@ -205,7 +204,7 @@ Item {
         id: doneLabel
         anchors.left: parent.left
         anchors.leftMargin: Theme.spacing
-        anchors.bottom: entryField.top
+        anchors.bottom: draftField.top
         anchors.bottomMargin: Theme.spacingTight
         visible: panel.finished.length > 0
         text: panel.finished.length + " done"
@@ -218,7 +217,7 @@ Item {
 
     // The entry field.
     TextField {
-        id: entryField
+        id: draftField
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.rightMargin: parent.width * 0.42
@@ -228,10 +227,8 @@ Item {
         height: implicitHeight
         variant: "outlined"
         placeholder: "Add a todo — \"standup 15m\""
-        text: panel.draft
-        onTextChanged: panel.draft = text
         onAccepted: panel.addTodo()
-        onEscapePressed: panel.draft = ""
+        onEscapePressed: draftField.text = ""
     }
 
     // ---- the pomodoro ----

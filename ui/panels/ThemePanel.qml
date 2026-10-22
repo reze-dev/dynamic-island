@@ -149,10 +149,11 @@ Item {
                 selectByMouse: true
                 selectionColor: Theme.primary
                 clip: true
-                text: panel.dirEditing
-                    ? panel.dirDraft
-                    : (panel.payload && panel.payload.dir ? panel.payload.dir : "")
-                onTextChanged: {
+                text: panel.payload && panel.payload.dir ? panel.payload.dir : ""
+                // Only the user's own typing writes back. A binding on the
+                // text breaks the first time it is typed into, so the field
+                // has to be told what to show again when the editing ends.
+                onTextEdited: {
                     if (panel.dirEditing)
                         panel.dirDraft = text;
                 }
@@ -160,6 +161,9 @@ Item {
                 Keys.onEscapePressed: {
                     panel.dirEditing = false;
                     panel.dirDraft = "";
+                    dirField.text = panel.payload && panel.payload.dir
+                        ? panel.payload.dir
+                        : "";
                     focus = false;
                 }
             }
@@ -226,6 +230,7 @@ Item {
             return;
         panel.bridge.callAndSay("wallpaper.setdir", { "dir": dir }, "Watching " + dir);
         panel.dirEditing = false;
+        dirField.text = dir;
     }
 
     // The grid. It has to scroll: a directory of wallpapers is usually bigger

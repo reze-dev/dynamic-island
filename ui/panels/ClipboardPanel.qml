@@ -11,7 +11,11 @@ Item {
     id: panel
 
     property var bridge: null
-    property string filter: ""
+    /// The search text. It lives in the field, not the other way round:
+    /// a field bound to a property breaks that binding the first time it
+    /// is typed into, and the two drift apart after that. Reading it back
+    /// out of the field means they cannot.
+    readonly property string filter: searchBox.text.trim().toLowerCase()
 
     readonly property var entries: bridge && bridge.clipboard ? bridge.clipboard : []
 
@@ -47,11 +51,7 @@ Item {
         variant: "outlined"
         icon: "search"
         placeholder: "Search the history"
-        text: panel.filter
-        onTextChanged: panel.filter = text
-        onEscapePressed: {
-            panel.filter = "";
-        }
+        onEscapePressed: searchBox.text = ""
     }
 
     // The actions.
