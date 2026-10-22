@@ -154,27 +154,22 @@ PanelWindow {
         onViewStepped: (delta) => root.stepView(delta)
         onFocusRequested: root.focusIsland()
         onActivityTriggered: (activity) => island.triggerWith(activity)
-        onNoticeRaised: (message) => root.notify(message)
+        onNoticeRaised: (message, action) => root.notify(message, action)
     }
 
     // The snackbar. It sits under the island, and it is the shell's way of
-    // saying that something happened.
+    // saying that something happened. It follows the island's bottom edge,
+    // the way the mock's toast does, so it turns up under a short island
+    // and under a tall one alike.
     Snackbar {
         id: snackbar
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 24
-        text: root.notice
-        action: root.noticeAction
+        anchors.top: island.bottom
+        anchors.topMargin: 20
     }
 
-    property string notice: ""
-    property string noticeAction: ""
-
-    function notify(message) {
-        notice = message;
-        noticeAction = "";
-        snackbar.shown = true;
+    function notify(message, action) {
+        snackbar.open(message, action);
     }
 
     // ---- routing ----

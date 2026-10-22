@@ -106,7 +106,10 @@ Item {
                     // settings; Quickshell does not surface the write, so
                     // this is the one thing the panel cannot do on its own.
                     if (panel.bridge)
-                        panel.bridge.call("network.wifi", { "enabled": value });
+                        panel.bridge.callAndSay(
+                            "network.wifi",
+                            { "enabled": value },
+                            value ? "Wi-Fi on" : "Wi-Fi off");
                 }
             }
 

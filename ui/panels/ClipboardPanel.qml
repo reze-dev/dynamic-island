@@ -69,14 +69,18 @@ Item {
             variant: "outlined"
             text: "Capture"
             icon: "copy"
-            onClicked: panel.bridge ? panel.bridge.call("clipboard.capture", {}) : null
+            onClicked: panel.bridge
+                ? panel.bridge.callAndSay("clipboard.capture", {}, "Captured the clipboard")
+                : null
         }
 
         Button {
             variant: "text"
             text: "Clear"
             visible: panel.entries.length > 0
-            onClicked: panel.bridge ? panel.bridge.call("clipboard.clear", {}) : null
+            onClicked: panel.bridge
+                ? panel.bridge.callAndSay("clipboard.clear", {}, "Clipboard cleared")
+                : null
         }
     }
 
@@ -190,7 +194,10 @@ Item {
                     size: 22
                     tooltip: "Copy back"
                     onClicked: panel.bridge
-                        ? panel.bridge.call("clipboard.paste", { "id": entry.modelData.id })
+                        ? panel.bridge.callAndSay(
+                            "clipboard.paste",
+                            { "id": entry.modelData.id },
+                            "Copied to clipboard")
                         : null
                 }
 

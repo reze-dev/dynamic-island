@@ -619,37 +619,52 @@ Still open, in this order:
 
 The UI is Material 3 now (§5.0) and the icons are the Material Symbols
 font. The seeded preview (`just preview-live` — panels with real data in
-them) found four faults the empty panels had hidden. Fix these first, and
-use the seeded preview as the gate:
+them) is what finds layout faults: an empty panel is a forgiving thing.
 
-| # | Where | Fault |
-|---|---|---|
-| 1 | `ui/panels/CalendarPanel.qml:113` | The empty-state `Text` is anchored to the panel's bottom, and so is the hour `ListView` below it. They overlap: "Nothing scheduled" lands on the 00:00 row. The empty state should replace the list, not sit on it. |
-| 2 | `ui/panels/NotesPanel.qml:88` | The list column is `parent.width * 0.62` from the right — 38% of a 480px panel — so note titles wrap to three lines and overflow their 40px card. Either elide the title or widen the column. |
-| 3 | `ui/panels/NotesPanel.qml:15` | `selectedId` starts empty and nothing selects the first note, so the editor opens as a blank box and the save state is blank. Select the first note when the list arrives. |
-| 4 | `ui/panels/NotificationsPanel.qml` | "Clear all" sits under the right-aligned "3 · 0 new" note rather than beside it. |
+**Done:**
 
-Then, in this order:
+- The calendar's empty state sat on top of the hour list. It takes the
+  list's place now, and the list hides itself when there is nothing in it.
+- The notes list had `elide` on a title that wrapped by default, so
+  titles ran to three lines and overflowed their card.
+- Nothing selected the first note, so the editor opened blank. It does
+  now — but only when the selected note has gone away, because the
+  daemon re-reads the notes directory on a timer and a refresh must not
+  yank the note out from under the reader.
+- "Clear all" sat below the right-aligned count. The count and the
+  action share the header's trailing edge now.
+- The header had a fifth fault: ten navigation buttons and a panel name
+  do not fit in 480 pixels, and "notifications" came out as "notificati…".
+  The panel is 520 wide now.
+- The snackbar was built and wired to nothing. `IsledBridge.announce()`
+  says it, `callAndSay()` says it and waits for the daemon's answer, and
+  the clipboard, todos, network, notifications and theme panels use it.
+  The preview rig photographs it, since it lives in the shell and not in
+  the island.
+- `FocusProbe.qml` and `FocusProbeItem.qml` are gone. Nothing
+  instantiated them, and `TextField.qml` covers the same ground.
+- Small things the renders turned up: the bluetooth section was headed
+  "Devices", which is what the Ethernet section is for; it also inherited
+  the height of the empty Ethernet section and sat out of line with the
+  Networks header beside it; and four panels said "1 ITEMS".
 
-5. **The snackbar is built and wired to nothing.** `IsledBridge` declares
-   `noticeRaised` and `ui/shell.qml:160` has the bar, but no panel raises
-   one. `clipboard.paste` and the notes save are the callers it wants;
-   add an `announce(message)` helper on the bridge and call it.
-6. `FocusProbe.qml` and `FocusProbeItem.qml` are dead — nothing
-   instantiates them, and `TextField.qml` covers the same ground. Delete
-   them.
-7. **Put it on the real machine.** `just start`, then
+**Next:**
+
+1. **Put it on the real machine.** `just start`, then
    `nixos-rebuild switch` and a session restart (§8.11). Everything so
    far has been the preview rig or a bare `shell.qml`; the island has
    never run against the real daemon inside the real session, and the
    top bar and the compositor blur have only been seen over a terminal.
-8. **The focus matrix** (§8.14), which the Material pass made worse:
+2. **The focus matrix** (§8.14), which the Material pass made worse:
    there are three more text fields now, in a window that cannot take
    compositor focus except by click.
-
-The open decisions in §9 are stale: #1, #4 and #5 are answered by code
-that already exists, and #7 ("Blur on niri: flat for now") is wrong —
-the blur is real (§4.10). Close them out.
+3. The media panel has never been photographed with anything in it — it
+   reads MPRIS, and there is no fake player the way there is a fake tray
+   item. Worth an `examples/fake-mpris.rs`, the way `fake-tray.rs` is
+   there for the tray.
+4. The open decisions in §9 are stale: #1, #4 and #5 are answered by
+   code that already exists, and #7 ("Blur on niri: flat for now") is
+   wrong — the blur is real (§4.10). Close them out.
 
 ## 9. Open decisions — ask before the relevant phase
 

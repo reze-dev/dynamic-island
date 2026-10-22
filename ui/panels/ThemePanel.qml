@@ -92,7 +92,9 @@ Item {
                 icon: "refresh"
                 size: 28
                 tooltip: "Pick a random wallpaper"
-                onClicked: panel.bridge ? panel.bridge.call("wallpaper.next", {}) : null
+                onClicked: panel.bridge
+                    ? panel.bridge.callAndSay("wallpaper.next", {}, "New wallpaper")
+                    : null
             }
 
             IconButton {
@@ -102,10 +104,10 @@ Item {
                 active: panel.loopOn
                 tooltip: panel.loopOn ? "Stop the rotation" : "Rotate every minute"
                 onClicked: panel.bridge
-                    ? panel.bridge.call("wallpaper.loop", {
+                    ? panel.bridge.callAndSay("wallpaper.loop", {
                         "enabled": !panel.loopOn,
                         "interval_secs": 60
-                    })
+                    }, panel.loopOn ? "Stopped the rotation" : "Rotating every minute")
                     : null
             }
         }
@@ -222,7 +224,7 @@ Item {
         var dir = panel.dirDraft.trim();
         if (dir === "")
             return;
-        panel.bridge.call("wallpaper.setdir", { "dir": dir });
+        panel.bridge.callAndSay("wallpaper.setdir", { "dir": dir }, "Watching " + dir);
         panel.dirEditing = false;
     }
 
@@ -344,7 +346,10 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: panel.bridge
-                        ? panel.bridge.call("wallpaper.set", { "path": modelData.path })
+                        ? panel.bridge.callAndSay(
+                            "wallpaper.set",
+                            { "path": modelData.path },
+                            "Wallpaper set")
                         : null
                 }
             }

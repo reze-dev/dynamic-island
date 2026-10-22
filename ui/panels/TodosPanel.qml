@@ -60,7 +60,7 @@ Item {
         if (parts.minutes > 0)
             args["due_in_minutes"] = parts.minutes;
         if (panel.bridge)
-            panel.bridge.call("todos.add", args);
+            panel.bridge.callAndSay("todos.add", args, "Added to the list");
         panel.draft = "";
     }
 

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import QtQuick.Window
+import "components"
 
 // A preview rig, and not part of the shell.
 //
@@ -187,27 +188,52 @@ ShellRoot {
             "ambient": null,
             "trigger": null,
             "view": 9
+        },
+        {
+            "name": "snackbar",
+            "mode": "full",
+            "hovered": false,
+            "ambient": null,
+            "trigger": null,
+            "view": 3
         }
     ]
 
     Window {
         id: win
         width: 560
-        height: 520
+        height: 600
         visible: true
         color: "#101014"
 
-        Island {
-            id: island
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: 24
-            mode: root.scenario.mode
-            hovered: root.scenario.hovered
-            ambient: root.scenario.ambient
-            trigger: root.scenario.trigger
-            view: root.scenario.view
-            bridge: root.bridge
+        Item {
+            id: stage
+            anchors.fill: parent
+
+            Island {
+                id: island
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: 24
+                mode: root.scenario.mode
+                hovered: root.scenario.hovered
+                ambient: root.scenario.ambient
+                trigger: root.scenario.trigger
+                view: root.scenario.view
+                bridge: root.bridge
+            }
+
+            // The snackbar belongs to the shell, not to the island, so it
+            // has to be brought in here to be photographed at all.
+            Snackbar {
+                id: snackbar
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: island.bottom
+                anchors.topMargin: 20
+                text: "Copied to clipboard"
+                action: "Paste"
+                shown: root.scenario.name === "snackbar"
+            }
         }
     }
 
@@ -236,7 +262,10 @@ ShellRoot {
             return;
         }
         var scenario = root.scenario;
-        island.grabToImage(function (result) {
+        // The island on its own for most of it; the whole stage for the
+        // snackbar, which sits outside the island.
+        var subject = scenario.name === "snackbar" ? stage : island;
+        subject.grabToImage(function (result) {
             result.saveToFile(root.output + "/" + scenario.name + ".png");
             root.index = root.index + 1;
         });

@@ -85,7 +85,11 @@ Rectangle {
     /// Say something.
     function open(message, actionLabel) {
         text = message === undefined ? text : message;
-        action = actionLabel === undefined ? action : actionLabel;
+        // A message with no action of its own does not keep the last one's.
+        action = actionLabel === undefined ? "" : actionLabel;
         shown = true;
+        // Saying the same thing twice should still show for the whole
+        // time, so the timer is restarted rather than left to run out.
+        hide.restart();
     }
 }

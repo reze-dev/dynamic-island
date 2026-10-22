@@ -75,7 +75,9 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: panel.bridge ? panel.bridge.clearNotifications() : null
+                onClicked: panel.bridge
+                    ? panel.bridge.callAndSay("notifications.clear", {}, "History cleared")
+                    : null
             }
         }
     }
