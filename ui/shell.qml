@@ -76,54 +76,6 @@ PanelWindow {
         radius: island.radius
     }
 
-    // The clock, in the corner.
-    //
-    // The mock draws a system bar across the top of its page: the brand on
-    // the left, the clock on the right. The page is black, so it can. The
-    // shell floats over whatever is really on the screen, and a brand
-    // plate in the corner of somebody's desktop is a foreign object — the
-    // mock's page header is not the desktop's header. The clock is worth
-    // keeping: the island's own clock goes away when a panel opens.
-    Item {
-        id: bar
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.topMargin: 14
-        height: 28
-
-        Rectangle {
-            id: clockPlate
-            anchors.right: parent.right
-            anchors.rightMargin: 25
-            anchors.verticalCenter: parent.verticalCenter
-            width: clockText.implicitWidth + 24
-            height: 28
-            radius: height / 2
-            color: Theme.glass
-            border.width: 1
-            border.color: Theme.hairline
-
-            Text {
-                id: clockText
-                anchors.centerIn: parent
-                text: Format.clock()
-                color: Theme.onSurfaceVariant
-                font.family: Theme.monoFamily
-                font.pixelSize: Theme.type.labelMedium.size
-                font.weight: Theme.type.labelMedium.weight
-                font.letterSpacing: Theme.type.labelMedium.tracking
-            }
-        }
-
-        Timer {
-            interval: 1000
-            running: true
-            repeat: true
-            onTriggered: clockText.text = Format.clock()
-        }
-    }
-
     Island {
         id: island
         anchors.horizontalCenter: parent.horizontalCenter

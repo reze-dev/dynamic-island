@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ctOS · Material Stealth</title>
+<title>Dynamic Island · Material Stealth</title>
 <style>
 :root{color-scheme:dark;--bg:#000;--surface:#111;--accent:#d2e3ff;--accent-dim:rgba(210,227,255,.1);--text:#e3e3e3;--muted:#9aa0a6;--glass:rgba(20,20,20,.88)}
 *{box-sizing:border-box}body{margin:0;height:100vh;overflow:hidden;background:var(--bg);color:var(--text);font:14px/1.4 "Segoe UI",Roboto,Helvetica,Arial,sans-serif;background-image:radial-gradient(circle at 20% 20%,rgba(210,227,255,.05),transparent 50%),radial-gradient(circle at 80% 80%,rgba(161,136,204,.05),transparent 50%)}
@@ -16,8 +16,8 @@
 </style>
 </head>
 <body>
-<header class="sysbar"><div class="brand"><span class="dot">●</span> ctOS // CORE</div><div id="clock">--:--</div></header>
-<div id="island" role="button" tabindex="0" aria-label="ctOS island"><div id="islandInner"></div></div>
+<header class="sysbar"><div class="brand"><span class="dot">●</span> DYNAMIC ISLAND</div><div id="clock">--:--</div></header>
+<div id="island" role="button" tabindex="0" aria-label="Open the island"><div id="islandInner"></div></div>
 <div class="hints"><kbd>Ctrl+J</kbd> Toggle Shell &nbsp; | &nbsp; <kbd>1–6</kbd> Modules &nbsp; | &nbsp; <kbd>Esc</kbd> Idle</div><div id="toast" class="toast" role="status"></div>
 <script>
 (() => {
@@ -31,7 +31,7 @@
   };
   const island=document.querySelector('#island'), inner=document.querySelector('#islandInner'), clock=document.querySelector('#clock'), toast=document.querySelector('#toast');
   let status='idle', context='NETWORK', playing=false, toastTimer, notesValue='';
-  try { notesValue=localStorage.getItem('ctos-notes')||''; } catch {}
+  try { notesValue=localStorage.getItem('dynamic-island-notes')||''; } catch {}
   const keys=Object.keys(modules);
   function notify(message){toast.textContent=message;toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),1700)}
   function icon(text, extra=''){return `<span class="symbol ${extra}">${text}</span>`}
@@ -40,8 +40,8 @@
       ['Wi-Fi','◉',navigator.onLine,'Browser reports network status'],['Bluetooth','ᛒ',false,'Hardware status unavailable in browser'],['Airplane','✈',false,'Demo control'],['VPN','⬡',false,'Demo control'],['Hotspot','⌁',false,'Demo control'],['NFC','⌗',false,'Demo control']
     ].map(([label,ico,on,sub])=>`<button class="tile ${on?'on':''}" data-toggle="${label}">${icon(ico)}<span>${label}<small>${label==='Wi-Fi'?(navigator.onLine?'Online':'Offline'):sub}</small></span></button>`).join('')}</div>`;
     if(context==='MEDIA') return `<div class="rowcard"><div class="cover"></div><div style="flex:1;min-width:0"><div style="font-weight:650">Glasshouse</div><div class="muted small">Aether Systems · Demo track</div></div></div><div class="track"><span></span></div><div class="controls"><button class="control" data-action="previous" aria-label="Previous">|◀</button><button class="control main" data-action="play" aria-label="Play or pause">${playing?'Ⅱ':'▶'}</button><button class="control" data-action="next" aria-label="Next">▶|</button></div><p class="muted small" style="text-align:center">Playback controls are illustrative in this prototype.</p>`;
-    if(context==='CLIPBOARD') return `<div>${['nix develop .#shell','https://quickshell.org','systemctl restart ctos'].map(t=>`<button class="clip" data-copy="${escapeAttr(t)}"><span>${escapeHtml(t)}</span><span>⧉</span></button>`).join('')}<p class="muted small">Select an item to copy it to your clipboard.</p></div>`;
-    if(context==='CALENDAR') {const now=new Date(),year=now.getFullYear(),month=now.getMonth(),first=new Date(year,month,1).getDay(),count=new Date(year,month+1,0).getDate();return `<div class="muted small" style="margin-bottom:10px">${now.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div><div class="calendar">${['S','M','T','W','T','F','S'].map(d=>`<div class="muted">${d}</div>`).join('')}${Array.from({length:first},()=>'<div></div>').join('')}${Array.from({length:count},(_,i)=>`<div class="day ${i+1===now.getDate()?'today':''}">${i+1}</div>`).join('')}</div><div class="event"><strong>14:00 · Platform Sync</strong><span class="muted">Demo event · Review ctOS geometry logic</span></div>`; }
+    if(context==='CLIPBOARD') return `<div>${['nix develop .#shell','https://quickshell.org','systemctl restart isled'].map(t=>`<button class="clip" data-copy="${escapeAttr(t)}"><span>${escapeHtml(t)}</span><span>⧉</span></button>`).join('')}<p class="muted small">Select an item to copy it to your clipboard.</p></div>`;
+    if(context==='CALENDAR') {const now=new Date(),year=now.getFullYear(),month=now.getMonth(),first=new Date(year,month,1).getDay(),count=new Date(year,month+1,0).getDate();return `<div class="muted small" style="margin-bottom:10px">${now.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div><div class="calendar">${['S','M','T','W','T','F','S'].map(d=>`<div class="muted">${d}</div>`).join('')}${Array.from({length:first},()=>'<div></div>').join('')}${Array.from({length:count},(_,i)=>`<div class="day ${i+1===now.getDate()?'today':''}">${i+1}</div>`).join('')}</div><div class="event"><strong>14:00 · Platform Sync</strong><span class="muted">Demo event · Review the island geometry</span></div>`; }
     if(context==='NOTES') return `<textarea id="notes" placeholder="Quick note...">${escapeHtml(notesValue)}</textarea><div class="muted small" style="margin-top:7px">Autosaves in this browser when storage is available.</div>`;
     return `<div class="notice">${icon('↻')}<div><strong class="small">System Update</strong><div class="muted small">Kernel update notification · Demo</div></div></div><div class="notice">${icon('◉')}<div><strong class="small">Network</strong><div class="muted small">${navigator.onLine?'Browser reports online':'Browser reports offline'}</div></div></div>`;
   }
@@ -50,11 +50,11 @@
   function render(){
     island.className=status==='idle'?'':status;
     island.style.setProperty('--panel-height',modules[context].height+'px');
-    if(status==='idle'){inner.innerHTML='<div class="idleview">ctOS</div>';island.setAttribute('aria-label','Open ctOS island');return;}
-    if(status==='active'){inner.innerHTML=`<div class="activeview"><div class="activeleft"><span class="glyph">${modules[context].icon}</span><span>${modules[context].label} Active</span></div><div class="pulse"><i></i><i></i><i></i><i></i></div></div>`;island.setAttribute('aria-label','Expand ctOS island');return;}
+    if(status==='idle'){inner.innerHTML='<div class="idleview">Dynamic Island</div>';island.setAttribute('aria-label','Open the island');return;}
+    if(status==='active'){inner.innerHTML=`<div class="activeview"><div class="activeleft"><span class="glyph">${modules[context].icon}</span><span>${modules[context].label} Active</span></div><div class="pulse"><i></i><i></i><i></i><i></i></div></div>`;island.setAttribute('aria-label','Expand the island');return;}
     inner.innerHTML=`<div class="expandedview"><div class="panelhead"><div class="paneltitle">${icon(modules[context].icon)}<span>${modules[context].label}</span></div><nav class="nav" aria-label="Modules">${keys.map((key,i)=>`<button title="${modules[key].label} (${i+1})" aria-label="${modules[key].label}" data-module="${key}" class="${context===key?'selected':''}">${modules[key].icon}</button>`).join('')}</nav></div><div class="panelbody">${panelBody()}</div></div>`;
     island.setAttribute('aria-label',modules[context].label+' panel');
-    const note=document.querySelector('#notes'); if(note) note.addEventListener('input',()=>{notesValue=note.value;try{localStorage.setItem('ctos-notes',notesValue)}catch{}});
+    const note=document.querySelector('#notes'); if(note) note.addEventListener('input',()=>{notesValue=note.value;try{localStorage.setItem('dynamic-island-notes',notesValue)}catch{}});
   }
   function setStatus(next){status=next;render()}
   island.addEventListener('click',()=>{if(status==='idle')setStatus('active');else if(status==='active')setStatus('expanded')});

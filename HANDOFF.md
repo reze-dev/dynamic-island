@@ -25,17 +25,16 @@ destination — too many moving parts. `isled` is designed as the session's core
 daemon from day one, not as a wallpaper/notification helper that later grows.
 See `PLAN.md` §3.5.
 
-The visual reference is `ctos-dynamic-island-context-aware-v2.html` — a React
-mock in this directory. It is a *visual* reference only. Its panels are the
-starting spec (`context | media | clipboard | calendar | notes | notifications
-| network`); the theme switcher was added later, and **todos** is the ninth.
+The visual reference is `dynamic-island-material.html` — a mock in this
+directory. It is a *visual* reference only. Its panels are the starting spec
+(`context | media | clipboard | calendar | notes | notifications | network`);
+the theme switcher was added later, and **todos** is the ninth.
 
 ## 2. Where everything is
 
 ```
 /home/reze/Projects/dynamic-island/
-├── ctos-dynamic-island-context-aware-v2.html   the visual mock
-├── ctos-material-stealth-fixed.html            the second visual reference
+├── dynamic-island-material.html                the visual reference
 ├── flake.nix                                  devshell + isled package + lib
 ├── PLAN.md                                    technical plan — read this
 ├── HANDOFF.md                                 this file
@@ -96,7 +95,7 @@ hyprland all installed, `systemctl --user` running, Quickshell live.
 | # | Decision | Why |
 |---|---|---|
 | 1 | **Rust core daemon + Quickshell UI**, not pure Quickshell | Morphing is trivial in QML (`States` + `Behavior`) and weeks of work in Rust. Context/event aggregation is the reverse. |
-| 2 | Naming: `isle` (UI), `isled` (daemon) | Chosen by user. Explicitly rejected "ctOS". |
+| 2 | Naming: `isle` (UI), `isled` (daemon) | Chosen by user. The project is called **Dynamic Island**; the old "ctOS" naming, from a design the user has since dropped, is gone from the shell, the mock and the docs. |
 | 3 | Wallpapers: **API + manual + browser-handoff** | User's choice. No scrapers. |
 | 4 | Wallpaper **rendering** delegated to awww | awww draws pixels, our shell owns the catalog. Behind a trait so `mpvpaper`/`hyprpaper` stay swappable. |
 | 5 | awww under `--namespace isle` | Isolates our daemon from any other awww, and namespaces the socket. |

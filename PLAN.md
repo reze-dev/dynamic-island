@@ -1,7 +1,7 @@
 # Dynamic Island Shell — Implementation Plan
 
 A context-aware, dynamically morphing island shell for niri and hyprland.
-Reference mock: `ctos-dynamic-island-context-aware-v2.html` (visual reference only).
+Reference mock: `dynamic-island-material.html` (visual reference only).
 
 > **Status, 2026-10-21.** Phases 0–2 are largely built, and parts of 3 and 5
 > with them: the daemon, the island's four appearances, all nine panels, the
