@@ -2,13 +2,21 @@ import QtQuick
 import QtQuick.Shapes
 import ".."
 
-// An icon drawn from the path data in Icons.qml.
+// An icon.
 //
-// Material Symbols are filled shapes rather than strokes, so the path is
-// filled: the artwork already carries its own weight, and filling it keeps
-// the outline and the filled variants interchangeable.
+// Material Symbols is a font, and a font is the best renderer there is
+// for a glyph: it is hinted for the size it is drawn at, it takes its
+// colour from the text, and it comes with the variable axes the icons
+// were designed around — FILL for the filled variants, wght for the
+// weight.
 //
-// The path is authored on a 24x24 grid and scaled to the item.
+// The text is drawn with the platform's own font engine rather than
+// Qt's, because the other path turns the glyph into a path and
+// rasterises that, which flattens the curves at the wrong resolution and
+// gives the icons the ragged edges the font was meant to avoid.
+//
+// The baked path data is the fallback, for a machine without the font
+// installed. It is the same artwork, taken from the font's own outlines.
 Item {
     id: root
 
@@ -20,27 +28,39 @@ Item {
     implicitWidth: 24
     implicitHeight: 24
 
-    readonly property real factor: width > 0 ? width / 24 : 1
+    Text {
+        id: glyph
+        anchors.fill: parent
+        // A name the font does not know is drawn as the name itself, which
+        // is a long smear rather than an icon. The width gives it away.
+        visible: Icons.available && implicitWidth <= width * 1.6
+        text: Icons.ligature(root.name)
+        color: root.color
+        font.family: Icons.family
+        font.pixelSize: Math.round(root.height)
+        // The FILL axis is how Material draws the filled variant of an
+        // icon. It is a map of axis to value, not a list.
+        font.variableAxes: { "FILL": root.filled ? 1 : 0 }
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
+        renderType: Text.NativeRendering
+        clip: true
+    }
 
     Shape {
-        id: shape
         width: 24
         height: 24
-        scale: root.factor
+        scale: Math.max(0.01, Math.min(root.width, root.height) / 24)
         transformOrigin: Item.TopLeft
+        visible: !Icons.available
 
         ShapePath {
             fillColor: root.color
-            // The stroke is turned off rather than made thin: a zero width
-            // still draws a hairline, and the icons are filled shapes.
             strokeColor: "transparent"
-            strokeWidth: 0
             // SVG fills with the nonzero rule, and the Material artwork is
             // drawn for it. Qt defaults to the even-odd rule, which punches
             // holes in the icons that have a shape inside a shape.
             fillRule: ShapePath.WindingFill
-            capStyle: ShapePath.RoundCap
-            joinStyle: ShapePath.RoundJoin
 
             PathSvg {
                 path: root.filled ? Icons.fillPath(root.name) : Icons.path(root.name)

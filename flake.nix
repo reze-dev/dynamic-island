@@ -54,6 +54,12 @@
             qt6.qtdeclarative # qmllint / qmlformat
             qt6.qtwayland
 
+            # The Material Symbols font the island's icons are drawn from.
+            # The icon set is a font, and a font has to be installed to be
+            # drawn; the target system has it (see the system module), and
+            # the dev shell needs it for the preview rig.
+            material-symbols
+
             # Wallpaper engine (PLAN §4.4).
             awww
 

@@ -374,11 +374,25 @@ will not take a JavaScript function for an easing curve, so the built-in
 `Easing.OutCubic` stands in for it; it passes through the same three points
 (0.60, 0.88, 0.98 against 0.61, 0.88, 0.98).
 
-**Icons.** Material Symbols, Rounded style, baked into `ui/Icons.qml` as
-path data on a 24×24 grid. The upstream artwork is on a 960-unit em box, so
-the paths are scaled by 24/960 and flipped. Baking them means the icons
-need no font, stay sharp at any size, and can be recoloured like any other
-shape.
+**Icons.** Material Symbols, Rounded style, and the icons are a *font* — the
+`Material Symbols Rounded` family, drawn as a ligature. A font is the best
+renderer there is for a glyph: it is hinted for the size it is drawn at, it
+takes its colour from the text, and it comes with the variable axes the
+icons were designed around, so `FILL` gives the filled variant of any icon
+and `wght` its weight.
+
+The text is drawn with `renderType: Text.NativeRendering`, which uses the
+platform's font engine. Qt's other path turns the glyph into a path and
+rasterises that, which flattens the curves at the wrong resolution and
+gives the icons exactly the ragged edges the font was meant to avoid.
+
+`ui/Icons.qml` holds the translation between the shell's own kebab-case
+names and the names the font knows, and it holds the path data for the
+fallback: a machine without the font installed draws the icons from that
+instead, which is the same artwork, taken from the font's own outlines, but
+rougher. The target system has the font — it is in
+`Michi/modules/system/base.nix` — and this repository's dev shell pulls it
+in, so the fallback is only for a machine that has neither.
 
 **Blur.** The expanded panel is glass: `rgba(20, 20, 20, 0.88)` over
 whatever the compositor blurs behind it. See §4.10.
