@@ -356,13 +356,16 @@ Item {
 
     SectionHeader {
         id: bluetoothHeader
-        anchors.top: panel.wiredDevices.length > 0 ? wired.bottom : wiredHeader.bottom
+        // With no wired devices the Ethernet header is invisible but still
+        // takes up its height, which pushed this one down out of line with
+        // the Networks header beside it.
+        anchors.top: panel.wiredDevices.length > 0 ? wired.bottom : tiles.bottom
         anchors.topMargin: Theme.spacing
         anchors.left: parent.left
         anchors.leftMargin: parent.width * 0.52
         anchors.right: parent.right
         anchors.rightMargin: Theme.spacing
-        title: "Devices"
+        title: "Bluetooth"
         note: panel.adapters && panel.adapters.values && panel.adapters.values.length > 0
             ? (panel.adapters.values[0].enabled ? "ON" : "OFF")
             : "NO ADAPTER"

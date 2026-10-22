@@ -47,7 +47,7 @@ Item {
         anchors.right: parent.right
         anchors.margins: Theme.spacing
         title: panel.currentEvent ? "In progress" : "Up next"
-        note: panel.events.length > 0 ? panel.events.length + " EVENTS" : ""
+        note: panel.events.length > 0 ? Format.plural(panel.events.length, "event") : ""
     }
 
     // The event that is happening right now, if any.
@@ -112,10 +112,16 @@ Item {
     }
 
     Text {
+        // In the list's place, not on top of it: an empty day has no hours
+        // worth showing, so the empty state takes the whole body.
+        anchors.top: currentCard.visible ? currentCard.bottom : header.bottom
+        anchors.topMargin: Theme.spacing
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Theme.spacing
+        anchors.leftMargin: Theme.spacing
+        anchors.rightMargin: Theme.spacing
         visible: panel.events.length === 0 && panel.currentEvent === null
         text: "Nothing scheduled. Point the calendar at a directory of .ics files."
         color: Theme.onSurfaceVariant
@@ -124,6 +130,7 @@ Item {
         font.weight: Theme.type.bodySmall.weight
         font.letterSpacing: Theme.type.bodySmall.tracking
         horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
         wrapMode: Text.WordWrap
     }
 
@@ -140,6 +147,7 @@ Item {
         clip: true
         spacing: 2
         model: panel.hours
+        visible: panel.events.length > 0 || panel.currentEvent !== null
 
         delegate: Item {
             id: slot

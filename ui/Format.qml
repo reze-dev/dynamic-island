@@ -129,4 +129,11 @@ QtObject {
         var parts = String(path).split("/");
         return parts[parts.length - 1];
     }
+
+    /// A count with its noun: "1 ITEM", "3 ITEMS". The count is uppercased
+    /// by the caller, so the noun comes back uppercased too.
+    function plural(count, noun) {
+        var upper = noun.toUpperCase();
+        return count + " " + (count === 1 ? upper : upper + "S");
+    }
 }

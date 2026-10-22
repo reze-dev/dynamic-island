@@ -25,29 +25,23 @@ Item {
         anchors.right: parent.right
         anchors.margins: Theme.spacing
         title: "History"
-        note: panel.notifications.length > 0
-            ? panel.notifications.length + " · " + panel.unreadCount + " new"
-            : ""
     }
 
-    Rectangle {
-        id: clearButton
-        anchors.top: header.bottom
+    // The count and the action share the header's trailing edge. Below the
+    // header they stacked up under the count and read as two right-aligned
+    // things fighting for the same corner.
+    Row {
+        id: trailing
+        anchors.verticalCenter: header.verticalCenter
         anchors.right: parent.right
-        anchors.topMargin: Theme.spacingTight
         anchors.rightMargin: Theme.spacing
-        width: clearLabel.implicitWidth + 20
-        height: 24
-        radius: Theme.radiusSmall
-        color: clearArea.containsMouse ? Theme.surfaceFillHover : Theme.surfaceFill
-        border.width: 1
-        border.color: Theme.outlineVariant
+        spacing: Theme.spacingTight + 2
         visible: panel.notifications.length > 0
 
         Text {
-            id: clearLabel
-            anchors.centerIn: parent
-            text: "Clear all"
+            id: countLabel
+            anchors.verticalCenter: parent.verticalCenter
+            text: panel.notifications.length + " · " + panel.unreadCount + " new"
             color: Theme.onSurfaceVariant
             font.family: Theme.fontFamily
             font.pixelSize: Theme.type.labelSmall.size
@@ -55,12 +49,34 @@ Item {
             font.letterSpacing: Theme.type.labelSmall.tracking
         }
 
-        MouseArea {
-            id: clearArea
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: panel.bridge ? panel.bridge.clearNotifications() : null
+        Rectangle {
+            id: clearButton
+            anchors.verticalCenter: parent.verticalCenter
+            width: clearLabel.implicitWidth + 20
+            height: 24
+            radius: Theme.radiusSmall
+            color: clearArea.containsMouse ? Theme.surfaceFillHover : Theme.surfaceFill
+            border.width: 1
+            border.color: Theme.outlineVariant
+
+            Text {
+                id: clearLabel
+                anchors.centerIn: parent
+                text: "Clear all"
+                color: Theme.onSurfaceVariant
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.type.labelSmall.size
+                font.weight: Theme.type.labelSmall.weight
+                font.letterSpacing: Theme.type.labelSmall.tracking
+            }
+
+            MouseArea {
+                id: clearArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: panel.bridge ? panel.bridge.clearNotifications() : null
+            }
         }
     }
 
@@ -96,7 +112,7 @@ Item {
 
     ListView {
         id: list
-        anchors.top: clearButton.visible ? clearButton.bottom : header.bottom
+        anchors.top: header.bottom
         anchors.topMargin: Theme.spacing
         anchors.left: parent.left
         anchors.right: parent.right

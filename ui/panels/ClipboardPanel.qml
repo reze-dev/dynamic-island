@@ -31,7 +31,7 @@ Item {
         anchors.right: parent.right
         anchors.margins: Theme.spacing
         title: "History"
-        note: panel.entries.length > 0 ? panel.entries.length + " ITEMS" : ""
+        note: panel.entries.length > 0 ? Format.plural(panel.entries.length, "item") : ""
     }
 
     // The search box.

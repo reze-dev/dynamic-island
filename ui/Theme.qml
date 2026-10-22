@@ -207,8 +207,10 @@ QtObject {
     readonly property int peekWidth: 300
     readonly property int peekHeight: 42
     /// The panel. As wide as it needs to be and no wider. Ten panels of
-    /// navigation in the header is what sets the floor here.
-    readonly property int panelWidth: 480
+    /// navigation in the header is most of that floor, and the panel's own
+    /// name has to fit beside them — "notifications" is the longest, and
+    /// at 480 it came out as "notificati…".
+    readonly property int panelWidth: 520
     /// The tallest a panel is allowed to grow, before the screen says no.
     readonly property int panelMaxHeight: 520
     /// The window the panel is allowed to leave for the rest of the screen.

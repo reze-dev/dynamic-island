@@ -34,7 +34,7 @@ Item {
         anchors.right: parent.right
         anchors.margins: Theme.spacing
         title: "System tray"
-        note: panel.items.length > 0 ? panel.items.length + " ITEMS" : ""
+        note: panel.items.length > 0 ? Format.plural(panel.items.length, "item") : ""
     }
 
     Text {

@@ -35,6 +35,42 @@ Item {
         panel.dirty = false;
     }
 
+    /// Opens the first note, so the editor is never a blank box.
+    function selectFirst() {
+        if (panel.notes.length === 0) {
+            panel.selectedId = "";
+            panel.draft = "";
+            panel.dirty = false;
+            return;
+        }
+        panel.selectedId = panel.notes[0].id;
+        panel.draft = panel.notes[0].body ? panel.notes[0].body : "";
+        panel.dirty = false;
+    }
+
+    /// True when the selected note is still in the list.
+    readonly property bool selectionIsLive: {
+        for (var i = 0; i < panel.notes.length; i++) {
+            if (panel.notes[i].id === panel.selectedId)
+                return true;
+        }
+        return false;
+    }
+
+    // The daemon re-reads the notes directory on a timer, so this fires
+    // over and over. Only touch the selection when the selected note has
+    // actually gone away — otherwise a refresh would yank the note out
+    // from under the reader and drop their unsaved edits.
+    onNotesChanged: {
+        if (!panel.selectionIsLive)
+            panel.selectFirst();
+    }
+
+    Component.onCompleted: {
+        if (!panel.selectionIsLive)
+            panel.selectFirst();
+    }
+
     function save() {
         if (!panel.bridge || !panel.selectedId)
             return;
@@ -65,7 +101,7 @@ Item {
         anchors.right: parent.right
         anchors.margins: Theme.spacing
         title: "Files"
-        note: panel.notes.length > 0 ? panel.notes.length + " FILES" : ""
+        note: panel.notes.length > 0 ? Format.plural(panel.notes.length, "file") : ""
     }
 
     // The list of notes.
@@ -110,6 +146,10 @@ Item {
                     font.pixelSize: Theme.type.bodySmall.size
                     font.weight: Theme.type.bodySmall.weight
                     font.letterSpacing: Theme.type.bodySmall.tracking
+                    // Text wraps by default, and elide does nothing to a
+                    // wrapped line — so the title ran to three lines and
+                    // overflowed the card. One line, cut off.
+                    wrapMode: Text.NoWrap
                     elide: Text.ElideRight
                 }
 
@@ -121,6 +161,8 @@ Item {
                     font.pixelSize: Theme.type.labelSmall.size
                     font.weight: Theme.type.labelSmall.weight
                     font.letterSpacing: Theme.type.labelSmall.tracking
+                    wrapMode: Text.NoWrap
+                    elide: Text.ElideRight
                 }
             }
 
