@@ -69,9 +69,12 @@ starting spec (`context | media | clipboard | calendar | notes | notifications
 │   ├── PanelCatalog.qml IslandSettings.qml
 │   ├── preview.qml                            photographs the island
 │   ├── demo.qml                               photographs the *animation*
-│   ├── components/                            Icon, Card, Chip, StatTile,
-│   │                                           IconButton, Toggle, ProgressRing,
-│   │                                           ActivityRow, SlideActivity, MiniBar
+│   ├── components/                            the Material component library:
+│   │                                           Icon, Card, Chip, StatTile, Tile,
+│   │                                           IconButton, Button, Toggle, TextField,
+│   │                                           ProgressRing, ActivityRow, SlideActivity,
+│   │                                           MiniBar, SectionHeader, Snackbar,
+│   │                                           StateLayer, Ripple
 │   └── panels/                                one file per panel, nine of them
 │
 ├── nix/
@@ -108,6 +111,7 @@ hyprland all installed, `systemctl --user` running, Quickshell live.
 | 14 | **The system timezone is read from `/etc/localtime` directly** | No datetime crate. A `TZif` reader is ~200 lines and the calendar needs it. |
 | 15 | **Quickshell's own services own the machine's state** | Network, bluetooth, battery and media come from `Quickshell.Networking`, `Quickshell.Bluetooth`, `Quickshell.Services.UPower` and `Quickshell.Services.Mpris`. The daemon only owns the shell's *own* state. |
 | 16 | **The surface never resizes** | Quickshell's `PanelWindow` has no `namespace` and no input region, so the surface is full width and transparent and only the island inside it changes shape. |
+| 17 | **The UI is Material 3** | The design target is `dynamic-island-material.html`: Material's colour roles, shape scale, type scale and state layers, with Material Symbols as the icon set. See §5.0. |
 
 ### Rejected approaches — do not revisit without new information
 
@@ -276,19 +280,38 @@ Quickshell 0.3's QML engine exposes `QtQuick` and `Quickshell.*`.
   (a panel, say) resolves them fine. The preview rig lives at `ui/preview.qml`
   for exactly this reason: it has to be in the same module as the island.
 
-### 4.10 Blur: niri can, Quickshell cannot ask
+### 4.10 Blur: niri can, and Quickshell 0.3.2 can ask
 
-niri 26.04 implements `ext-background-effect-v1` with blur. It can be forced
-from the compositor side with a `layer-rule { background-effect { blur true } }`.
+niri 26.04 implements `ext-background-effect-v1` with blur, and also speaks
+the older `org_kde_kwin_blur`.
 
-**The blocker is Quickshell.** As of 0.3.2 it has a private
-`Quickshell/Wayland/_BackgroundEffect` C++ directory but exports **no**
-QML-facing blur type, and `PanelWindow` has no `namespace` property, so every
-Quickshell layer surface reports `namespace="quickshell"` and cannot be
-targeted separately from Ryoku's.
+**Quickshell 0.3.2 exports the QML type.** `Quickshell.Wayland` has a
+`BackgroundEffect` attached property, and `Quickshell.Region` describes the
+area to blur:
 
-Also note: a translucent surface looks like blur and is not — that is the
-distinction worth keeping straight.
+```qml
+import Quickshell.Wayland
+
+PanelWindow {
+    BackgroundEffect.blurRegion: Region { item: island; radius: island.radius }
+}
+```
+
+The region follows the item, so the blur follows the island as it morphs.
+Setting `blurRegion` to null removes the blur, which is what the island does
+when it is not open: the idle pill is a hole in the screen and there is
+nothing behind it worth blurring.
+
+Verified on niri 26.04: the expanded panel is genuinely frosted, with the
+wallpaper showing through it.
+
+Two things worth keeping straight:
+
+- A translucent surface looks like blur and is not. The panel's own glass
+  (`rgba(20, 20, 20, 0.88)`) and the compositor's blur are different
+  mechanisms; the shell uses both.
+- The blur is the compositor's, so it needs the compositor's protocol. On a
+  compositor without it, the island still works and the panel is just glass.
 
 ### 4.11 Two Quickshell limits that shape the whole UI
 
@@ -309,32 +332,76 @@ clicked.
 
 **2. The layer namespace cannot be set.**
 
-Every Quickshell surface is `namespace="quickshell"`. This kills the
-compositor-side blur plan while any other Quickshell shell is running.
+Every Quickshell surface is `namespace="quickshell"`, so a compositor rule
+cannot single out the island's surface from another Quickshell shell's. The
+blur does not need it — the surface asks for its own blur region — but a
+compositor-side rule would.
 
 Both limits disappear at Ryoku cutover.
 
 ## 5. What was built, and what it looks like
 
+### 5.0 The design system — Material 3
+
+The design target is `dynamic-island-material.html` in the root of the repo:
+a Material-dark mock of the same shell. The UI follows it.
+
+**Colour.** Material's role names, in the dark scheme, anchored on the
+mock's single light-blue accent: `primary` `#d2e3ff`, `onPrimary`
+`#00325b`, `surface` `#111`, `onSurface` `#e3e3e3`, `onSurfaceVariant`
+`#9aa0a6`, `outlineVariant` `#40474f`, and so on. Everything visual comes
+from `ui/Theme.qml`; there is not one hard-coded colour left outside it.
+
+> QML reserves the `on` prefix for signal handlers, so a property called
+> `onPrimary` would be read as a handler for `primaryChanged` and would
+> never be given a value — it would silently stay black. The colours
+> therefore live under their own names (`primaryInk`) and the Material names
+> are aliases onto them.
+
+**Shape.** Material's scale: 4, 8, 12, 16, 28, and full. The island's panel
+is a 28; a chip is an 8.
+
+**Type.** Material's scale, as `Theme.type.<role>.{size, line, weight,
+tracking}`: `titleMedium` is 16/500, `bodyMedium` is 14/400, `labelSmall`
+is 11/500 with half a pixel of tracking.
+
+**State.** Material's state layers — an 8% wash on hover, 10% on press, 16%
+when dragged — plus the ripple that spreads from the point of contact.
+`ui/components/StateLayer.qml` and `ui/components/Ripple.qml`.
+
+**Motion.** Material's emphasized curve is `cubic-bezier(0.2, 0, 0, 1)`. QML
+will not take a JavaScript function for an easing curve, so the built-in
+`Easing.OutCubic` stands in for it; it passes through the same three points
+(0.60, 0.88, 0.98 against 0.61, 0.88, 0.98).
+
+**Icons.** Material Symbols, Rounded style, baked into `ui/Icons.qml` as
+path data on a 24×24 grid. The upstream artwork is on a 960-unit em box, so
+the paths are scaled by 24/960 and flipped. Baking them means the icons
+need no font, stay sharp at any size, and can be recoloured like any other
+shape.
+
+**Blur.** The expanded panel is glass: `rgba(20, 20, 20, 0.88)` over
+whatever the compositor blurs behind it. See §4.10.
+
 ### 5.1 The island — four appearances, three sizes
 
 | Appearance | Size | What it shows |
 |---|---|---|
-| **idle** | 132×36 | A coloured dot and the clock. Nothing else. |
-| **peek** | 320×42 | On hover: the last thing that happened, plus a sliver of CPU and memory. |
-| **triggered** | 380×56 | An event grew the island. It shows the glyph, the headline and the supporting line, then folds back on its own. |
-| **full** | 520 × per-panel | A panel. Reached by a keybind or by clicking the island. |
+| **idle** | 140×34 | A coloured dot and the clock. Nothing else. |
+| **peek** | 300×42 | On hover: the last thing that happened, plus a sliver of CPU and memory. |
+| **triggered** | 300×42 | An event grew the island. It shows the glyph, the headline and the supporting line, then folds back on its own. |
+| **full** | 480 × per-panel | A panel. Reached by a keybind or by clicking the island. |
 
 The dot's colour is the *tone* of whatever the island last reacted to:
-neutral, info (lavender), good (green), warn (amber) or critical (red). A
-sticky activity (music playing, a timer running) sets the tone and keeps
-setting it; a transient one (a notification) sets it and then lets the
+neutral, info (the accent blue), good (green), warn (amber) or critical
+(red). A sticky activity (music playing, a timer running) sets the tone and
+keeps setting it; a transient one (a notification) sets it and then lets the
 ambient condition take it back.
 
-The morph is `Behavior on width/height/radius` with `Easing.OutQuart` over
-380 ms. The activity content **slides** rather than cross-fading, because a
-cross-fade reads as "a new window opened" and a slide reads as "the same thing
-saying something else" — `ui/components/SlideActivity.qml`.
+The morph is `Behavior on width/height/radius` with Material's emphasized
+curve over 500 ms. The activity content **slides** rather than cross-fading,
+because a cross-fade reads as "a new window opened" and a slide reads as
+"the same thing saying something else" — `ui/components/SlideActivity.qml`.
 
 ### 5.2 The panels
 

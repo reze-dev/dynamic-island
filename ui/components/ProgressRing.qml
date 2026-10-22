@@ -4,13 +4,15 @@ import ".."
 
 // A ring that fills as the pomodoro runs.
 //
-// The sweep is a real arc rather than a trick with two half circles, so it
-// can show any fraction without a visible seam.
+// Material's circular progress: a track all the way round, and an
+// indicator that starts at twelve o'clock and sweeps clockwise. The sweep
+// is a real arc rather than a trick with two half circles, so it can show
+// any fraction without a visible seam.
 Item {
     id: root
 
     property real progress: 0
-    property color tone: Theme.toneGood
+    property color tone: Theme.primary
     property real thickness: 4
     property string caption: ""
     property string subcaption: ""
@@ -24,7 +26,7 @@ Item {
     Shape {
         anchors.fill: parent
         ShapePath {
-            strokeColor: Qt.rgba(1, 1, 1, 0.08)
+            strokeColor: Theme.surfaceFillHighest
             strokeWidth: root.thickness
             fillColor: "transparent"
             capStyle: ShapePath.RoundCap
@@ -64,14 +66,14 @@ Item {
 
     Column {
         anchors.centerIn: parent
-        spacing: 1
+        spacing: 2
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.caption
-            color: Theme.text
+            color: Theme.onSurface
             font.family: Theme.monoFamily
-            font.pixelSize: Theme.fontTitle
+            font.pixelSize: Theme.type.titleMedium.size
             font.weight: Font.DemiBold
         }
 
@@ -79,10 +81,11 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             visible: root.subcaption !== ""
             text: root.subcaption
-            color: Theme.textDim
+            color: Theme.onSurfaceVariant
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontTiny
-            font.letterSpacing: 0.6
+            font.pixelSize: Theme.type.labelSmall.size
+            font.weight: Theme.type.labelSmall.weight
+            font.letterSpacing: Theme.type.labelSmall.tracking
         }
     }
 }

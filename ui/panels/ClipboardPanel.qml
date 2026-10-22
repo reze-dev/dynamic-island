@@ -35,7 +35,7 @@ Item {
     }
 
     // The search box.
-    Rectangle {
+    TextField {
         id: searchBox
         anchors.top: header.bottom
         anchors.topMargin: Theme.spacingTight
@@ -43,60 +43,14 @@ Item {
         anchors.right: parent.right
         anchors.leftMargin: Theme.spacing
         anchors.rightMargin: Theme.spacing
-        height: 32
-        radius: Theme.radiusSmall
-        color: Theme.well
-        border.width: 1
-        border.color: searchArea.activeFocus ? Theme.accent : Theme.border
-
-        Icon {
-            id: searchIcon
-            anchors.left: parent.left
-            anchors.leftMargin: Theme.spacingTight + 2
-            anchors.verticalCenter: parent.verticalCenter
-            name: "search"
-            width: 13
-            height: 13
-            color: Theme.textFaint
-        }
-
-        TextInput {
-            id: searchField
-            anchors.left: searchIcon.right
-            anchors.leftMargin: Theme.spacingTight
-            anchors.right: parent.right
-            anchors.rightMargin: Theme.spacingTight
-            anchors.verticalCenter: parent.verticalCenter
-            color: Theme.text
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSmall
-            selectByMouse: true
-            selectionColor: Theme.accent
-            clip: true
-            text: panel.filter
-            onTextChanged: panel.filter = text
-            Keys.onEscapePressed: {
-                panel.filter = "";
-                focus = false;
-            }
-        }
-
-        Text {
-            anchors.left: searchIcon.right
-            anchors.leftMargin: Theme.spacingTight
-            anchors.verticalCenter: parent.verticalCenter
-            visible: searchField.text === ""
-            text: "Search the history"
-            color: Theme.textFaint
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSmall
-        }
-
-        MouseArea {
-            id: searchArea
-            anchors.fill: parent
-            cursorShape: Qt.IBeamCursor
-            onClicked: searchField.forceActiveFocus()
+        height: implicitHeight
+        variant: "outlined"
+        icon: "search"
+        placeholder: "Search the history"
+        text: panel.filter
+        onTextChanged: panel.filter = text
+        onEscapePressed: {
+            panel.filter = "";
         }
     }
 
@@ -111,72 +65,18 @@ Item {
         anchors.rightMargin: Theme.spacing
         spacing: Theme.spacingTight
 
-        Rectangle {
-            width: captureLabel.implicitWidth + 20
-            height: 26
-            radius: Theme.radiusSmall
-            color: captureArea.containsMouse ? Theme.cardHover : Theme.card
-            border.width: 1
-            border.color: Theme.border
-
-            Row {
-                anchors.centerIn: parent
-                spacing: 5
-
-                Icon {
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: "copy"
-                    width: 12
-                    height: 12
-                    color: Theme.textDim
-                }
-
-                Text {
-                    id: captureLabel
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Capture"
-                    color: Theme.textDim
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
-                    font.weight: Font.Medium
-                }
-            }
-
-            MouseArea {
-                id: captureArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: panel.bridge ? panel.bridge.call("clipboard.capture", {}) : null
-            }
+        Button {
+            variant: "outlined"
+            text: "Capture"
+            icon: "copy"
+            onClicked: panel.bridge ? panel.bridge.call("clipboard.capture", {}) : null
         }
 
-        Rectangle {
-            width: clearLabel.implicitWidth + 20
-            height: 26
-            radius: Theme.radiusSmall
-            color: clearArea.containsMouse ? Theme.cardHover : Theme.card
-            border.width: 1
-            border.color: Theme.border
+        Button {
+            variant: "text"
+            text: "Clear"
             visible: panel.entries.length > 0
-
-            Text {
-                id: clearLabel
-                anchors.centerIn: parent
-                text: "Clear"
-                color: Theme.textDim
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontTiny
-                font.weight: Font.Medium
-            }
-
-            MouseArea {
-                id: clearArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: panel.bridge ? panel.bridge.call("clipboard.clear", {}) : null
-            }
+            onClicked: panel.bridge ? panel.bridge.call("clipboard.clear", {}) : null
         }
     }
 
@@ -184,9 +84,11 @@ Item {
         anchors.centerIn: parent
         visible: panel.entries.length === 0
         text: "The clipboard history is empty."
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontBody
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
     }
 
     Text {
@@ -195,9 +97,11 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         visible: panel.entries.length > 0 && panel.visibleEntries.length === 0
         text: "Nothing matches."
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontBody
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
     }
 
     ListView {
@@ -211,7 +115,7 @@ Item {
         anchors.rightMargin: Theme.spacing
         anchors.bottomMargin: Theme.spacing
         clip: true
-        spacing: 5
+        spacing: 6
         model: panel.visibleEntries
 
         delegate: Card {
@@ -220,7 +124,7 @@ Item {
 
             width: list.width
             height: 34
-            radius: Theme.radiusSmall
+            radius: Theme.radiusMedium
 
             Row {
                 id: clipRow
@@ -235,7 +139,7 @@ Item {
                     text: entry.modelData.kind ? entry.modelData.kind.toUpperCase() : "TEXT"
                     tone: entry.modelData.kind === "url"
                         ? Theme.toneInfo
-                        : (entry.modelData.kind === "code" ? Theme.toneGood : Theme.textDim)
+                        : (entry.modelData.kind === "code" ? Theme.toneGood : Theme.onSurfaceVariant)
                 }
 
                 Text {
@@ -245,9 +149,11 @@ Item {
                         - ageText.width - pinButton.width - copyButton.width
                         - trashButton.width - clipRow.spacing * 5)
                     text: entry.modelData.text
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSmall
+                    color: Theme.onSurface
+                    font.family: Theme.monoFamily
+                    font.pixelSize: Theme.type.bodySmall.size
+                    font.weight: Theme.type.bodySmall.weight
+                    font.letterSpacing: Theme.type.bodySmall.tracking
                     elide: Text.ElideRight
                 }
 
@@ -255,9 +161,11 @@ Item {
                     id: ageText
                     anchors.verticalCenter: parent.verticalCenter
                     text: Format.ago(entry.modelData.created_at_unix)
-                    color: Theme.textFaint
+                    color: Theme.onSurfaceVariant
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
                 }
 
                 IconButton {

@@ -65,10 +65,11 @@ Item {
                     text: panel.payload && panel.payload.engine
                         ? "Engine · " + panel.payload.engine
                         : "Engine · none"
-                    color: Theme.text
+                    color: Theme.onSurface
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSmall
-                    font.weight: Font.DemiBold
+                    font.pixelSize: Theme.type.bodySmall.size
+                    font.weight: Theme.type.bodySmall.weight
+                    font.letterSpacing: Theme.type.bodySmall.tracking
                     elide: Text.ElideRight
                 }
 
@@ -77,9 +78,11 @@ Item {
                     text: panel.engineOk
                         ? "ready"
                         : "not answering — the catalog still works"
-                    color: panel.engineOk ? Theme.textDim : Theme.toneWarn
+                    color: panel.engineOk ? Theme.onSurfaceVariant : Theme.toneWarn
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
                     elide: Text.ElideRight
                 }
             }
@@ -129,18 +132,20 @@ Item {
                 name: "folder"
                 width: 14
                 height: 14
-                color: Theme.textFaint
+                color: Theme.onSurfaceVariant
             }
 
             TextInput {
                 id: dirField
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.max(0, parent.width - 110)
-                color: Theme.text
+                color: Theme.onSurface
                 font.family: Theme.monoFamily
-                font.pixelSize: Theme.fontTiny
+                font.pixelSize: Theme.type.labelSmall.size
+                font.weight: Theme.type.labelSmall.weight
+                font.letterSpacing: Theme.type.labelSmall.tracking
                 selectByMouse: true
-                selectionColor: Theme.accent
+                selectionColor: Theme.primary
                 clip: true
                 text: panel.dirEditing
                     ? panel.dirDraft
@@ -161,10 +166,11 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: !panel.dirEditing
                 text: "change"
-                color: changeArea.containsMouse ? Theme.text : Theme.textFaint
+                color: changeArea.containsMouse ? Theme.onSurface : Theme.onSurfaceVariant
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontTiny
-                font.weight: Font.Medium
+                font.pixelSize: Theme.type.labelSmall.size
+                font.weight: Theme.type.labelSmall.weight
+                font.letterSpacing: Theme.type.labelSmall.tracking
 
                 MouseArea {
                     id: changeArea
@@ -186,18 +192,19 @@ Item {
                 width: applyLabel.implicitWidth + 16
                 height: 24
                 radius: Theme.radiusSmall
-                color: Theme.accentDim
+                color: Theme.primaryDim
                 border.width: 1
-                border.color: Theme.accent
+                border.color: Theme.primary
 
                 Text {
                     id: applyLabel
                     anchors.centerIn: parent
                     text: "Apply"
-                    color: Theme.accent
+                    color: Theme.primary
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
-                    font.weight: Font.DemiBold
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
                 }
 
                 MouseArea {
@@ -244,7 +251,7 @@ Item {
             anchors.rightMargin: -Theme.spacingTight
             width: 3
             radius: 1.5
-            color: Theme.textFaint
+            color: Theme.onSurfaceVariant
             opacity: scroller.moving || scroller.atYBeginning ? 0 : 0.5
             height: Math.max(24, scroller.height * (scroller.height / Math.max(1, scroller.contentHeight)))
             y: scroller.contentY * (scroller.height / Math.max(1, scroller.contentHeight))
@@ -276,9 +283,9 @@ Item {
                     id: frame
                     anchors.fill: parent
                     radius: Theme.radiusSmall
-                    color: Theme.well
+                    color: Theme.surfaceFillLow
                     border.width: panel.current === modelData.path ? 2 : 0
-                    border.color: Theme.accent
+                    border.color: Theme.primary
                     clip: true
 
                     Image {
@@ -298,7 +305,7 @@ Item {
                         radius: parent.radius
                         color: "transparent"
                         border.width: 1
-                        border.color: Theme.border
+                        border.color: Theme.outlineVariant
                     }
                 }
 
@@ -312,7 +319,7 @@ Item {
                         anchors.fill: parent
                         anchors.margins: 1
                         radius: Theme.radiusSmall
-                        color: Qt.rgba(0, 0, 0, 0.45)
+                        color: Theme.scrim
                     }
                 }
 
@@ -323,10 +330,11 @@ Item {
                     anchors.margins: 5
                     visible: tileArea.containsMouse
                     text: modelData.name
-                    color: Theme.text
+                    color: Theme.onSurface
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
-                    font.weight: Font.DemiBold
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
                     elide: Text.ElideRight
                 }
 
@@ -348,8 +356,10 @@ Item {
         anchors.centerIn: scroller
         visible: panel.items.length === 0
         text: "No images in that directory."
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontBody
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
     }
 }

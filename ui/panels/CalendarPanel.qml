@@ -62,7 +62,7 @@ Item {
         height: 52
         visible: panel.currentEvent !== null
         border.width: 1
-        border.color: Qt.rgba(Theme.toneGood.r, Theme.toneGood.g, Theme.toneGood.b, 0.4)
+        border.color: Theme.stateLayer(Theme.toneGood, 0.4)
 
         Row {
             anchors.fill: parent
@@ -85,10 +85,11 @@ Item {
                 Text {
                     width: parent.width
                     text: panel.currentEvent ? panel.currentEvent.summary : ""
-                    color: Theme.text
+                    color: Theme.onSurface
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontBody
-                    font.weight: Font.DemiBold
+                    font.pixelSize: Theme.type.bodySmall.size
+                    font.weight: Theme.type.bodySmall.weight
+                    font.letterSpacing: Theme.type.bodySmall.tracking
                     elide: Text.ElideRight
                 }
 
@@ -99,9 +100,11 @@ Item {
                             ? panel.currentEvent.location
                             : "in progress")
                         : ""
-                    color: Theme.textDim
+                    color: Theme.onSurfaceVariant
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
                     elide: Text.ElideRight
                 }
             }
@@ -115,9 +118,11 @@ Item {
         anchors.bottomMargin: Theme.spacing
         visible: panel.events.length === 0 && panel.currentEvent === null
         text: "Nothing scheduled. Point the calendar at a directory of .ics files."
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSmall
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
     }
@@ -154,17 +159,18 @@ Item {
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: Format.hourLabel(slot.modelData.start)
-                    color: slot.modelData.isNow ? Theme.accent : Theme.textFaint
+                    color: slot.modelData.isNow ? Theme.primary : Theme.onSurfaceVariant
                     font.family: Theme.monoFamily
-                    font.pixelSize: Theme.fontTiny
-                    font.weight: slot.modelData.isNow ? Font.DemiBold : Font.Normal
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
                 }
 
                 Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 34
                     height: 1
-                    color: Theme.border
+                    color: Theme.outlineVariant
                     visible: slot.modelData.isNow
                 }
             }
@@ -209,10 +215,11 @@ Item {
                                 Text {
                                     width: parent.width
                                     text: modelData.summary
-                                    color: Theme.text
+                                    color: Theme.onSurface
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSmall
-                                    font.weight: Font.DemiBold
+                                    font.pixelSize: Theme.type.bodySmall.size
+                                    font.weight: Theme.type.bodySmall.weight
+                                    font.letterSpacing: Theme.type.bodySmall.tracking
                                     elide: Text.ElideRight
                                 }
 
@@ -222,9 +229,11 @@ Item {
                                     text: modelData.location
                                         ? modelData.location
                                         : modelData.description
-                                    color: Theme.textDim
+                                    color: Theme.onSurfaceVariant
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontTiny
+                                    font.pixelSize: Theme.type.labelSmall.size
+                                    font.weight: Theme.type.labelSmall.weight
+                                    font.letterSpacing: Theme.type.labelSmall.tracking
                                     elide: Text.ElideRight
                                 }
                             }
@@ -232,9 +241,11 @@ Item {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: Format.timeOfDay(modelData.start_unix)
-                                color: Theme.textFaint
+                                color: Theme.onSurfaceVariant
                                 font.family: Theme.monoFamily
-                                font.pixelSize: Theme.fontTiny
+                                font.pixelSize: Theme.type.labelSmall.size
+                                font.weight: Theme.type.labelSmall.weight
+                                font.letterSpacing: Theme.type.labelSmall.tracking
                             }
                         }
                     }

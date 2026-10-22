@@ -1,31 +1,62 @@
 import QtQuick
 import ".."
 
-// A small pill of text, used for kinds, states and counts.
+// A chip: a small piece of text in a rounded box, with an optional glyph.
+//
+// Material has several kinds. The assist chip carries an icon that acts on
+// the thing it sits next to. The filter chip is a toggle, and shows a tick
+// when it is on. The suggestion chip is a shortcut to something.
+//
+// What they share is the shape: eight pixels of corner, a one pixel
+// outline, and a label in the middle.
 Rectangle {
     id: root
 
     property string text: ""
-    property color tone: Theme.accent
-    property bool subtle: false
-    property int horizontalPadding: 7
+    /// The glyph, or the empty string.
+    property string icon: ""
+    /// Whether the chip is a filter that is switched on.
+    property bool checked: false
+    property bool filter: false
+    property color tone: Theme.onSurfaceVariant
+    property int horizontalPadding: 12
 
-    implicitWidth: label.implicitWidth + horizontalPadding * 2
-    implicitHeight: 20
-    radius: 10
+    implicitWidth: row.width + horizontalPadding * 2
+    implicitHeight: 32
+    radius: Theme.radiusSmall
 
-    color: subtle ? "transparent" : Qt.rgba(tone.r, tone.g, tone.b, 0.13)
-    border.width: subtle ? 1 : 0
-    border.color: Qt.rgba(tone.r, tone.g, tone.b, 0.22)
+    color: root.checked ? Theme.secondaryContainer : "transparent"
+    border.width: 1
+    border.color: root.checked ? "transparent" : Theme.outlineVariant
 
-    Text {
-        id: label
+    Behavior on color {
+        ColorAnimation {
+            duration: Theme.stateLayerDuration
+        }
+    }
+
+    Row {
+        id: row
         anchors.centerIn: parent
-        text: root.text
-        color: root.tone
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontTiny
-        font.weight: Font.DemiBold
-        font.letterSpacing: 0.4
+        spacing: 8
+
+        Icon {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.icon !== ""
+            name: root.icon
+            width: 18
+            height: width
+            color: root.checked ? Theme.onSecondaryContainer : root.tone
+        }
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.text
+            color: root.checked ? Theme.onSecondaryContainer : root.tone
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.type.labelLarge.size
+            font.weight: Theme.type.labelLarge.weight
+            font.letterSpacing: Theme.type.labelLarge.tracking
+        }
     }
 }

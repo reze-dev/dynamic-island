@@ -30,14 +30,14 @@ Item {
         id: slideOut
         property: "y"
         duration: Theme.slideDuration
-        easing.type: Easing.OutQuart
+        easing: Theme.emphasized
     }
 
     NumberAnimation {
         id: slideIn
         property: "y"
         duration: Theme.slideDuration
-        easing.type: Easing.OutQuart
+        easing: Theme.emphasized
     }
 
     function show(next) {

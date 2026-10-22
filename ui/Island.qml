@@ -30,6 +30,10 @@ Rectangle {
     /// The daemon connection, for the live numbers in the peek view.
     property var bridge: null
 
+    /// The tallest the panel may grow. The shell sets this from the height
+    /// of the screen, so that a tall panel never runs off the top of it.
+    property int maxHeight: Theme.panelMaxHeight
+
     /// The shell routes these. They are raised here rather than in the root
     /// because a `PanelWindow` is not an `Item` and cannot take the Keys
     /// attached property.
@@ -58,6 +62,18 @@ Rectangle {
         return hovered ? "peek" : "idle";
     }
 
+    /// The glyph of whatever is currently on the island, or the one of the
+    /// panel that is open.
+    readonly property string glyph: {
+        if (displayState === "full")
+            return PanelCatalog.glyph(view);
+        if (trigger)
+            return trigger.glyph ? trigger.glyph : "spark";
+        if (ambient)
+            return ambient.glyph ? ambient.glyph : "spark";
+        return "spark";
+    }
+
     // ---- geometry ----
 
     readonly property int targetWidth: {
@@ -65,51 +81,56 @@ Rectangle {
         case "full":
             return Theme.panelWidth;
         case "triggered":
-            return Theme.triggeredWidth;
+            return Theme.activeWidth;
         case "peek":
             return Theme.peekWidth;
         default:
-            return Theme.compactWidth;
+            return Theme.idleWidth;
         }
     }
 
     readonly property int targetHeight: {
         switch (displayState) {
         case "full":
-            return PanelCatalog.heightFor(view);
+            return Math.min(PanelCatalog.heightFor(view), maxHeight);
         case "triggered":
-            return Theme.triggeredHeight;
+            return Theme.activeHeight;
         case "peek":
             return Theme.peekHeight;
         default:
-            return Theme.compactHeight;
+            return Theme.idleHeight;
         }
     }
 
+    /// A pill is a circle; a panel is a rounded rectangle.
+    readonly property int targetRadius: displayState === "full"
+        ? Theme.radiusExtraLarge
+        : Math.round(targetHeight / 2)
+
     width: targetWidth
     height: targetHeight
-    radius: displayState === "full" ? Theme.radiusPanel : Math.round(targetHeight / 2)
-    color: displayState === "full" ? Theme.islandSurfacePanel : Theme.islandSurface
+    radius: targetRadius
+    color: displayState === "full" ? Theme.glass : Theme.islandSurface
     border.width: 1
-    border.color: displayState === "full" ? Theme.borderStrong : Theme.border
+    border.color: displayState === "full" ? Theme.hairline : "transparent"
     clip: true
 
     Behavior on width {
         NumberAnimation {
             duration: Theme.morphDuration
-            easing.type: Easing.OutQuart
+            easing: Theme.emphasized
         }
     }
     Behavior on height {
         NumberAnimation {
             duration: Theme.morphDuration
-            easing.type: Easing.OutQuart
+            easing: Theme.emphasized
         }
     }
     Behavior on radius {
         NumberAnimation {
             duration: Theme.morphDuration
-            easing.type: Easing.OutQuart
+            easing: Theme.emphasized
         }
     }
     Behavior on color {
@@ -197,9 +218,9 @@ Rectangle {
 
             Rectangle {
                 id: idleDot
-                width: 7
-                height: 7
-                radius: 3.5
+                width: 8
+                height: 8
+                radius: 4
                 color: Theme.toneColor(island.dotTone)
                 anchors.verticalCenter: parent.verticalCenter
 
@@ -214,10 +235,11 @@ Rectangle {
                 id: clock
                 anchors.verticalCenter: parent.verticalCenter
                 text: Format.clock()
-                color: Theme.textDim
+                color: Theme.onSurfaceVariant
                 font.family: Theme.monoFamily
-                font.pixelSize: Theme.fontSmall
-                font.letterSpacing: 0.3
+                font.pixelSize: Theme.type.labelMedium.size
+                font.weight: Theme.type.labelMedium.weight
+                font.letterSpacing: Theme.overlineTracking
             }
         }
 
@@ -254,9 +276,9 @@ Rectangle {
 
             Rectangle {
                 id: peekDot
-                width: 7
-                height: 7
-                radius: 3.5
+                width: 8
+                height: 8
+                radius: 4
                 color: Theme.toneColor(island.dotTone)
                 anchors.verticalCenter: parent.verticalCenter
 
@@ -291,9 +313,11 @@ Rectangle {
                 spacing: Theme.spacingTight
                 Text {
                     text: "cpu"
-                    color: Theme.textFaint
+                    color: Theme.onSurfaceVariant
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
                     width: 22
                 }
                 MiniBar {
@@ -301,7 +325,7 @@ Rectangle {
                     value: island.bridge && island.bridge.stats
                         ? (island.bridge.stats.cpu_percent || 0) / 100
                         : 0
-                    tone: Theme.toneInfo
+                    tone: Theme.primary
                 }
             }
 
@@ -309,9 +333,11 @@ Rectangle {
                 spacing: Theme.spacingTight
                 Text {
                     text: "mem"
-                    color: Theme.textFaint
+                    color: Theme.onSurfaceVariant
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
                     width: 22
                 }
                 MiniBar {
@@ -346,33 +372,65 @@ Rectangle {
             // The triggered state is a pill, so its corners are round, and
             // the badge has to clear the arc or it is clipped by it. The
             // margin is the radius of the pill.
-            anchors.leftMargin: Math.round(Theme.triggeredHeight / 2)
+            anchors.leftMargin: Math.round(Theme.activeHeight / 2)
             anchors.right: parent.right
-            anchors.rightMargin: Math.round(Theme.triggeredHeight / 2)
+            anchors.rightMargin: Math.round(Theme.activeHeight / 2)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.spacingTight + 2
-
-            Rectangle {
-                id: triggerDot
-                width: 8
-                height: 8
-                radius: 4
-                color: Theme.toneColor(island.dotTone)
-                anchors.verticalCenter: parent.verticalCenter
-
-                Behavior on color {
-                    ColorAnimation {
-                        duration: Theme.crossfadeDuration
-                    }
-                }
-            }
 
             SlideActivity {
                 id: triggerActivity
                 anchors.verticalCenter: parent.verticalCenter
-                width: triggerRow.width - triggerDot.width - triggerRow.spacing
+                width: triggerRow.width - pulse.width - triggerRow.spacing * 2
                 height: 40
                 activity: island.trigger
+            }
+
+            // The bars that say something is happening.
+            Row {
+                id: pulse
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 3
+                height: 14
+
+                Repeater {
+                    model: 4
+
+                    Item {
+                        id: pulseBar
+                        required property int index
+
+                        width: 3
+                        height: 14
+
+                        Rectangle {
+                            id: bar
+                            width: parent.width
+                            height: 6
+                            y: (parent.height - height) / 2
+                            radius: width / 2
+                            color: Theme.primary
+
+                            SequentialAnimation on height {
+                                running: true
+                                loops: Animation.Infinite
+                                PauseAnimation {
+                                    duration: pulseBar.index * 70
+                                }
+                                NumberAnimation {
+                                    to: 13
+                                    duration: 380
+                                    easing.type: Easing.InOutSine
+                                }
+                                NumberAnimation {
+                                    to: 6
+                                    duration: 380
+                                    easing.type: Easing.InOutSine
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -398,46 +456,44 @@ Rectangle {
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
-            height: 48
-
-            Rectangle {
-                anchors.fill: parent
-                color: "transparent"
-                border.width: 0
-            }
+            height: 56
 
             Rectangle {
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: 1
-                color: Theme.border
-                opacity: 0.7
+                color: Theme.outlineVariant
+                opacity: 0.6
             }
 
             Row {
                 id: headerLeft
                 anchors.left: parent.left
                 anchors.leftMargin: Theme.spacing
+                anchors.right: headerRight.left
+                anchors.rightMargin: Theme.spacingTight
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.spacingTight
+                spacing: Theme.spacingTight + 1
 
                 Icon {
                     anchors.verticalCenter: parent.verticalCenter
                     name: PanelCatalog.glyph(island.view)
-                    width: 15
-                    height: 15
-                    color: Theme.accent
+                    width: 20
+                    height: 20
+                    color: Theme.primary
                 }
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, headerLeft.width - 28)
                     text: PanelCatalog.name(island.view)
-                    color: Theme.text
+                    color: Theme.onSurface
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontMedium
-                    font.weight: Font.DemiBold
-                    font.letterSpacing: 0.2
+                    font.pixelSize: Theme.type.titleMedium.size
+                    font.weight: Theme.type.titleMedium.weight
+                    font.letterSpacing: Theme.type.titleMedium.tracking
+                    elide: Text.ElideRight
                 }
             }
 
@@ -446,7 +502,7 @@ Rectangle {
                 anchors.right: parent.right
                 anchors.rightMargin: Theme.spacingTight
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 1
+                spacing: 4
 
                 Repeater {
                     model: PanelCatalog.names.length
@@ -454,14 +510,16 @@ Rectangle {
                     Item {
                         required property int index
 
-                        width: 28
-                        height: 28
+                        width: 26
+                        height: 26
 
                         IconButton {
                             anchors.fill: parent
                             icon: PanelCatalog.glyph(parent.index)
-                            size: 28
+                            size: 26
                             selected: island.view === parent.index
+                            variant: "standard"
+                            plated: true
                             tooltip: PanelCatalog.name(parent.index)
                                 + " · " + PanelCatalog.shortcut(parent.index)
                             onClicked: island.view = parent.index
@@ -472,22 +530,16 @@ Rectangle {
                 Rectangle {
                     width: 1
                     height: 16
-                    color: Theme.border
+                    color: Theme.outlineVariant
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
                 IconButton {
                     icon: "close"
-                    size: 28
+                    size: 26
                     tooltip: "Collapse · Esc"
                     onClicked: island.collapse()
                 }
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                acceptedButtons: Qt.LeftButton
-                onClicked: island.collapse()
             }
         }
 
@@ -543,7 +595,7 @@ Rectangle {
         // Digits pick a panel directly, the way the mock does.
         var text = event.text;
         if (text >= "1" && text <= "9") {
-            var index = parseInt(text) - 1;
+            const index = parseInt(text) - 1;
             island.viewRequested(index);
             event.accepted = true;
         }

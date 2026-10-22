@@ -41,18 +41,22 @@ Item {
         anchors.centerIn: parent
         visible: panel.items.length === 0
         text: "Nothing in the tray."
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontBody
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
     }
 
     Text {
         anchors.centerIn: parent
         visible: panel.items.length > 0 && panel.visibleItems.length === 0
         text: "Every item is passive, so none of them are showing."
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSmall
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
     }
 
     Flow {
@@ -72,7 +76,7 @@ Item {
 
                 width: 92
                 height: 92
-                radius: Theme.radiusCard
+                radius: Theme.radiusMedium
                 selected: false
 
                 Column {
@@ -107,17 +111,18 @@ Item {
                             name: "grid"
                             width: 26
                             height: 26
-                            color: Theme.textDim
+                            color: Theme.onSurfaceVariant
                         }
                     }
 
                     Text {
                         width: parent.width
                         text: modelData.title
-                        color: Theme.text
+                        color: Theme.onSurface
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontTiny
-                        font.weight: Font.DemiBold
+                        font.pixelSize: Theme.type.labelSmall.size
+                        font.weight: Theme.type.labelSmall.weight
+                        font.letterSpacing: Theme.type.labelSmall.tracking
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
                     }
@@ -128,9 +133,11 @@ Item {
                                 || modelData.category === ""
                             ? "application"
                             : modelData.category
-                        color: Theme.textFaint
+                        color: Theme.onSurfaceVariant
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontTiny
+                        font.pixelSize: Theme.type.labelSmall.size
+                        font.weight: Theme.type.labelSmall.weight
+                        font.letterSpacing: Theme.type.labelSmall.tracking
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
                     }
@@ -163,10 +170,10 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     anchors.margins: -6
-                    radius: Theme.radiusCard
+                    radius: Theme.radiusMedium
                     color: "transparent"
                     border.width: 1
-                    border.color: Theme.accent
+                    border.color: Theme.primary
                     visible: tooltipArea.containsMouse
                 }
 
@@ -183,21 +190,23 @@ Item {
                     anchors.bottom: parent.top
                     anchors.bottomMargin: 6
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: tip.implicitWidth + 14
-                    height: 26
-                    radius: 7
-                    color: Theme.islandSurfacePanel
+                    width: tip.implicitWidth + 20
+                    height: 28
+                    radius: Theme.radiusSmall
+                    color: Theme.surfaceContainerHighest
                     border.width: 1
-                    border.color: Theme.border
+                    border.color: Theme.outlineVariant
                     z: 40
 
                     Text {
                         id: tip
                         anchors.centerIn: parent
                         text: modelData.tooltip
-                        color: Theme.textDim
+                        color: Theme.onSurfaceVariant
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontTiny
+                        font.pixelSize: Theme.type.labelSmall.size
+                        font.weight: Theme.type.labelSmall.weight
+                        font.letterSpacing: Theme.type.labelSmall.tracking
                     }
                 }
             }

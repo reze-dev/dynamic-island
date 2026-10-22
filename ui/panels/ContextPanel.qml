@@ -60,7 +60,7 @@ Item {
                 detail: panel.stats && panel.stats.load_average !== null
                     ? "load " + panel.stats.load_average.toFixed(2)
                     : ""
-                tone: panel.stats && panel.stats.cpu_percent > 80 ? Theme.toneWarn : Theme.text
+                tone: panel.stats && panel.stats.cpu_percent > 80 ? Theme.toneWarn : Theme.onSurface
             }
 
             StatTile {
@@ -79,7 +79,7 @@ Item {
                 label: "UPTIME"
                 value: panel.stats ? Format.uptime(panel.stats.uptime_secs) : "—"
                 detail: panel.session ? panel.session.compositor : ""
-                tone: Theme.textDim
+                tone: Theme.onSurfaceVariant
             }
 
             StatTile {
@@ -87,7 +87,7 @@ Item {
                 label: "UNREAD"
                 value: bridge ? String(bridge.unreadCount) : "0"
                 detail: bridge && bridge.notifications ? bridge.notifications.length + " total" : ""
-                tone: bridge && bridge.unreadCount > 0 ? Theme.toneWarn : Theme.textDim
+                tone: bridge && bridge.unreadCount > 0 ? Theme.toneWarn : Theme.onSurfaceVariant
             }
         }
 
@@ -101,15 +101,17 @@ Item {
 
         Item {
             width: parent.width
-            height: Math.max(40, panel.highlights.length * 44)
+            height: Math.max(44, panel.highlights.length * 50)
 
             Text {
                 anchors.centerIn: parent
                 visible: panel.highlights.length === 0
                 text: "Nothing has asked for your attention."
-                color: Theme.textFaint
+                color: Theme.onSurfaceVariant
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontBody
+                font.pixelSize: Theme.type.bodySmall.size
+                font.weight: Theme.type.bodySmall.weight
+                font.letterSpacing: Theme.type.bodySmall.tracking
             }
 
             Column {
@@ -124,63 +126,17 @@ Item {
                         required property int index
 
                         width: parent.width
-                        height: 40
-                        radius: Theme.radiusSmall
+                        height: 44
+                        radius: Theme.radiusMedium
 
-                        Row {
-                            id: activityRow
+                        ActivityRow {
                             anchors.left: parent.left
-                            anchors.leftMargin: Theme.spacingTight + 2
+                            anchors.leftMargin: Theme.spacingTight + 4
                             anchors.right: parent.right
-                            anchors.rightMargin: Theme.spacingTight + 2
+                            anchors.rightMargin: Theme.spacingTight + 4
                             anchors.verticalCenter: parent.verticalCenter
-                            spacing: Theme.spacingTight + 2
-
-                            Rectangle {
-                                id: activityDot
-                                width: 6
-                                height: 6
-                                radius: 3
-                                color: Theme.toneColor(modelData.tone ? modelData.tone : "neutral")
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-
-                            Icon {
-                                id: activityIcon
-                                anchors.verticalCenter: parent.verticalCenter
-                                name: modelData.glyph ? modelData.glyph : "spark"
-                                width: 14
-                                height: 14
-                                color: Theme.toneColor(modelData.tone ? modelData.tone : "neutral")
-                            }
-
-                            Text {
-                                id: activityTitle
-                                anchors.verticalCenter: parent.verticalCenter
-                                // The title takes what the subtitle has not
-                                // claimed, so the row cannot overflow the card
-                                // and clip the subtitle at the edge.
-                                width: Math.max(0, activityRow.width
-                                    - activityDot.width - activityIcon.width
-                                    - activitySubtitle.width - activityRow.spacing * 3)
-                                text: modelData.title ? modelData.title : ""
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontBody
-                                font.weight: Font.Medium
-                                elide: Text.ElideRight
-                            }
-
-                            Text {
-                                id: activitySubtitle
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: modelData.subtitle ? modelData.subtitle : ""
-                                color: Theme.textFaint
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontTiny
-                                elide: Text.ElideRight
-                                width: Math.min(implicitWidth, activityRow.width * 0.4)
-                            }
+                            height: 44
+                            activity: modelData
                         }
                     }
                 }
@@ -207,7 +163,7 @@ Item {
                         name: "timer"
                         width: 17
                         height: 17
-                        color: panel.timer && panel.timer.running ? Theme.toneGood : Theme.textFaint
+                        color: panel.timer && panel.timer.running ? Theme.toneGood : Theme.onSurfaceVariant
                     }
 
                     Column {
@@ -220,10 +176,11 @@ Item {
                             text: panel.timer && panel.timer.phase && panel.timer.phase !== "idle"
                                 ? panel.timer.phase
                                 : "No timer running"
-                            color: Theme.text
+                            color: Theme.onSurface
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontBody
-                            font.weight: Font.DemiBold
+                            font.pixelSize: Theme.type.bodySmall.size
+                            font.weight: Theme.type.bodySmall.weight
+                            font.letterSpacing: Theme.type.bodySmall.tracking
                             elide: Text.ElideRight
                         }
 
@@ -232,9 +189,11 @@ Item {
                             text: panel.timer && panel.timer.remaining_ms
                                 ? Format.duration(panel.timer.remaining_ms) + " left"
                                 : "start one from the todos panel"
-                            color: Theme.textDim
+                            color: Theme.onSurfaceVariant
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontTiny
+                            font.pixelSize: Theme.type.labelSmall.size
+                            font.weight: Theme.type.labelSmall.weight
+                            font.letterSpacing: Theme.type.labelSmall.tracking
                             elide: Text.ElideRight
                         }
                     }
@@ -255,7 +214,7 @@ Item {
                         name: "check-square"
                         width: 17
                         height: 17
-                        color: panel.todo ? Theme.toneWarn : Theme.textFaint
+                        color: panel.todo ? Theme.toneWarn : Theme.onSurfaceVariant
                     }
 
                     Column {
@@ -266,10 +225,11 @@ Item {
                         Text {
                             width: parent.width
                             text: panel.todo ? panel.todo.text : "Nothing scheduled"
-                            color: Theme.text
+                            color: Theme.onSurface
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontBody
-                            font.weight: Font.DemiBold
+                            font.pixelSize: Theme.type.bodySmall.size
+                            font.weight: Theme.type.bodySmall.weight
+                            font.letterSpacing: Theme.type.bodySmall.tracking
                             elide: Text.ElideRight
                         }
 
@@ -278,9 +238,11 @@ Item {
                             text: panel.todo && panel.todo.due_unix
                                 ? "due " + Format.until(panel.todo.due_unix)
                                 : "no deadline"
-                            color: Theme.textDim
+                            color: Theme.onSurfaceVariant
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontTiny
+                            font.pixelSize: Theme.type.labelSmall.size
+                            font.weight: Theme.type.labelSmall.weight
+                            font.letterSpacing: Theme.type.labelSmall.tracking
                             elide: Text.ElideRight
                         }
                     }

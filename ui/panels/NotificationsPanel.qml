@@ -39,19 +39,20 @@ Item {
         width: clearLabel.implicitWidth + 20
         height: 24
         radius: Theme.radiusSmall
-        color: clearArea.containsMouse ? Theme.cardHover : Theme.card
+        color: clearArea.containsMouse ? Theme.surfaceFillHover : Theme.surfaceFill
         border.width: 1
-        border.color: Theme.border
+        border.color: Theme.outlineVariant
         visible: panel.notifications.length > 0
 
         Text {
             id: clearLabel
             anchors.centerIn: parent
             text: "Clear all"
-            color: Theme.textDim
+            color: Theme.onSurfaceVariant
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontTiny
-            font.weight: Font.Medium
+            font.pixelSize: Theme.type.labelSmall.size
+            font.weight: Theme.type.labelSmall.weight
+            font.letterSpacing: Theme.type.labelSmall.tracking
         }
 
         MouseArea {
@@ -74,7 +75,7 @@ Item {
             name: "bell"
             width: 22
             height: 22
-            color: Theme.textFaint
+            color: Theme.onSurfaceVariant
         }
 
         Text {
@@ -82,9 +83,11 @@ Item {
             text: panel.holdingBusName
                 ? "Nothing yet. Anything calling org.freedesktop.Notifications lands here."
                 : "isled is not holding the bus name, so nothing else can be seen here."
-            color: Theme.textFaint
+            color: Theme.onSurfaceVariant
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSmall
+            font.pixelSize: Theme.type.bodySmall.size
+            font.weight: Theme.type.bodySmall.weight
+            font.letterSpacing: Theme.type.bodySmall.tracking
             horizontalAlignment: Text.AlignHCenter
             width: 340
             wrapMode: Text.WordWrap
@@ -111,7 +114,7 @@ Item {
 
             width: list.width
             height: row.implicitHeight + Theme.spacingTight * 2
-            radius: Theme.radiusSmall
+            radius: Theme.radiusMedium
 
             Rectangle {
                 anchors.fill: parent
@@ -119,7 +122,7 @@ Item {
                 color: "transparent"
                 border.width: 1
                 border.color: entry.modelData.urgency === 2
-                    ? Qt.rgba(Theme.toneCritical.r, Theme.toneCritical.g, Theme.toneCritical.b, 0.35)
+                    ? Theme.stateLayer(Theme.toneCritical, 0.35)
                     : "transparent"
             }
 
@@ -135,19 +138,17 @@ Item {
 
                 Rectangle {
                     id: noticeIcon
-                    width: 26
-                    height: 26
-                    radius: 8
-                    color: Qt.rgba(Theme.toneColor(entry.modelData.urgency === 2 ? "critical" : "info").r,
-                        Theme.toneColor(entry.modelData.urgency === 2 ? "critical" : "info").g,
-                        Theme.toneColor(entry.modelData.urgency === 2 ? "critical" : "info").b, 0.16)
+                    width: 28
+                    height: 28
+                    radius: width / 2
+                    color: Theme.stateLayer(Theme.toneColor(entry.modelData.urgency === 2 ? "critical" : "info"), 0.16)
                     anchors.verticalCenter: parent.verticalCenter
 
                     Icon {
                         anchors.centerIn: parent
                         name: "bell"
-                        width: 13
-                        height: 13
+                        width: 14
+                        height: 14
                         color: Theme.toneColor(entry.modelData.urgency === 2 ? "critical" : "info")
                     }
                 }
@@ -166,29 +167,33 @@ Item {
 
                         Text {
                             text: entry.modelData.app_name ? entry.modelData.app_name : "unknown"
-                            color: Theme.textDim
+                            color: Theme.onSurfaceVariant
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontTiny
-                            font.weight: Font.Medium
+                            font.pixelSize: Theme.type.labelSmall.size
+                            font.weight: Theme.type.labelSmall.weight
+                            font.letterSpacing: Theme.type.labelSmall.tracking
                             elide: Text.ElideRight
                             width: Math.min(implicitWidth, 90)
                         }
 
                         Text {
                             text: Format.ago(entry.modelData.received_at_unix)
-                            color: Theme.textFaint
+                            color: Theme.onSurfaceVariant
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontTiny
+                            font.pixelSize: Theme.type.labelSmall.size
+                            font.weight: Theme.type.labelSmall.weight
+                            font.letterSpacing: Theme.type.labelSmall.tracking
                         }
                     }
 
                     Text {
                         width: parent.width
                         text: entry.modelData.summary ? entry.modelData.summary : "(no summary)"
-                        color: Theme.text
+                        color: Theme.onSurface
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontBody
-                        font.weight: Font.DemiBold
+                        font.pixelSize: Theme.type.bodySmall.size
+                        font.weight: Theme.type.bodySmall.weight
+                        font.letterSpacing: Theme.type.bodySmall.tracking
                         elide: Text.ElideRight
                     }
 
@@ -196,9 +201,11 @@ Item {
                         width: parent.width
                         visible: entry.modelData.body !== ""
                         text: entry.modelData.body
-                        color: Theme.textDim
+                        color: Theme.onSurfaceVariant
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSmall
+                        font.pixelSize: Theme.type.bodySmall.size
+                        font.weight: Theme.type.bodySmall.weight
+                        font.letterSpacing: Theme.type.bodySmall.tracking
                         maximumLineCount: 2
                         elide: Text.ElideRight
                         wrapMode: Text.WordWrap
@@ -233,10 +240,11 @@ Item {
                     id: dismissText
                     anchors.verticalCenter: parent.verticalCenter
                     text: "dismiss"
-                    color: dismissArea.containsMouse ? Theme.text : Theme.textFaint
+                    color: dismissArea.containsMouse ? Theme.onSurface : Theme.onSurfaceVariant
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
-                    font.weight: Font.Medium
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
 
                     MouseArea {
                         id: dismissArea

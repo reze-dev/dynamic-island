@@ -1,13 +1,19 @@
 module components
 
-Icon 1.0 Icon.qml
+ActivityRow 1.0 ActivityRow.qml
+Button 1.0 Button.qml
 Card 1.0 Card.qml
 Chip 1.0 Chip.qml
-StatTile 1.0 StatTile.qml
+Icon 1.0 Icon.qml
 IconButton 1.0 IconButton.qml
-Toggle 1.0 Toggle.qml
-ProgressRing 1.0 ProgressRing.qml
-ActivityRow 1.0 ActivityRow.qml
 MiniBar 1.0 MiniBar.qml
+ProgressRing 1.0 ProgressRing.qml
+Ripple 1.0 Ripple.qml
 SectionHeader 1.0 SectionHeader.qml
 SlideActivity 1.0 SlideActivity.qml
+Snackbar 1.0 Snackbar.qml
+StateLayer 1.0 StateLayer.qml
+StatTile 1.0 StatTile.qml
+TextField 1.0 TextField.qml
+Tile 1.0 Tile.qml
+Toggle 1.0 Toggle.qml

@@ -9,7 +9,7 @@ Item {
     property string label: ""
     property string value: "—"
     property string detail: ""
-    property color tone: Theme.text
+    property color tone: Theme.onSurface
 
     implicitHeight: column.implicitHeight
 
@@ -17,25 +17,26 @@ Item {
         id: column
         anchors.left: parent.left
         anchors.right: parent.right
-        spacing: 3
+        spacing: 2
 
         Text {
             text: root.value
             color: root.tone
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontLarge
-            font.weight: Font.DemiBold
+            font.pixelSize: Theme.type.titleLarge.size
+            font.weight: Theme.type.titleLarge.weight
+            font.letterSpacing: Theme.type.titleLarge.tracking
             elide: Text.ElideRight
             width: parent.width
         }
 
         Text {
             text: root.label
-            color: Theme.textDim
+            color: Theme.onSurfaceVariant
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontTiny
-            font.weight: Font.Medium
-            font.letterSpacing: 0.6
+            font.pixelSize: Theme.type.labelSmall.size
+            font.weight: Theme.type.labelSmall.weight
+            font.letterSpacing: Theme.type.labelSmall.tracking
             elide: Text.ElideRight
             width: parent.width
         }
@@ -43,9 +44,10 @@ Item {
         Text {
             visible: root.detail !== ""
             text: root.detail
-            color: Theme.textFaint
+            color: Theme.onSurfaceVariant
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontTiny
+            font.pixelSize: Theme.type.bodySmall.size
+            font.letterSpacing: Theme.type.bodySmall.tracking
             elide: Text.ElideRight
             width: parent.width
         }

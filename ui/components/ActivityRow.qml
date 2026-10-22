@@ -19,17 +19,17 @@ Item {
     readonly property string subtitle: activity && activity.subtitle ? activity.subtitle : ""
     readonly property string glyph: activity && activity.glyph ? activity.glyph : "spark"
 
-    implicitHeight: compact ? 22 : 40
+    implicitHeight: compact ? 24 : 40
 
     Rectangle {
         id: badge
         visible: root.showGlyph
-        width: root.compact ? 24 : 34
+        width: root.compact ? 24 : 32
         height: width
-        radius: root.compact ? 8 : 11
-        color: Qt.rgba(root.tone.r, root.tone.g, root.tone.b, 0.16)
+        radius: width / 2
+        color: Theme.stateLayer(root.tone, 0.16)
         border.width: 1
-        border.color: Qt.rgba(root.tone.r, root.tone.g, root.tone.b, 0.28)
+        border.color: Theme.stateLayer(root.tone, 0.28)
 
         Icon {
             anchors.centerIn: parent
@@ -37,13 +37,12 @@ Item {
             width: Math.round(parent.width * 0.55)
             height: width
             color: root.tone
-            strokeWidth: 1.9
         }
     }
 
     Column {
         anchors.left: badge.visible ? badge.right : parent.left
-        anchors.leftMargin: badge.visible ? Theme.spacingTight + 2 : 0
+        anchors.leftMargin: badge.visible ? Theme.spacingTight + 4 : 0
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         spacing: 1
@@ -51,10 +50,11 @@ Item {
         Text {
             width: parent.width
             text: root.title
-            color: Theme.text
+            color: Theme.onSurface
             font.family: Theme.fontFamily
-            font.pixelSize: root.compact ? Theme.fontBody : Theme.fontMedium
-            font.weight: Font.DemiBold
+            font.pixelSize: root.compact ? Theme.type.bodyMedium.size : Theme.type.bodyLarge.size
+            font.weight: root.compact ? Theme.type.bodyMedium.weight : Theme.type.bodyLarge.weight
+            font.letterSpacing: root.compact ? Theme.type.bodyMedium.tracking : Theme.type.bodyLarge.tracking
             elide: Text.ElideRight
         }
 
@@ -62,9 +62,10 @@ Item {
             width: parent.width
             visible: !root.compact && root.subtitle !== ""
             text: root.subtitle
-            color: Theme.textDim
+            color: Theme.onSurfaceVariant
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSmall
+            font.pixelSize: Theme.type.bodySmall.size
+            font.letterSpacing: Theme.type.bodySmall.tracking
             elide: Text.ElideRight
         }
     }

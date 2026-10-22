@@ -2,12 +2,15 @@ import QtQuick
 import ".."
 
 // The title of a panel section, with an optional right-hand note.
+//
+// Material's list subheader: a small label in the quiet colour, with
+// nothing else around it.
 Item {
     id: root
 
     property string title: ""
     property string note: ""
-    property color tone: Theme.text
+    property color tone: Theme.onSurfaceVariant
 
     implicitHeight: 20
 
@@ -17,9 +20,9 @@ Item {
         text: root.title
         color: root.tone
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontMedium
-        font.weight: Font.DemiBold
-        font.letterSpacing: -0.1
+        font.pixelSize: Theme.type.labelLarge.size
+        font.weight: Theme.type.labelLarge.weight
+        font.letterSpacing: Theme.type.labelLarge.tracking
     }
 
     Text {
@@ -27,10 +30,10 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         visible: root.note !== ""
         text: root.note
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontTiny
-        font.weight: Font.Medium
-        font.letterSpacing: 0.8
+        font.pixelSize: Theme.type.labelSmall.size
+        font.weight: Theme.type.labelSmall.weight
+        font.letterSpacing: Theme.type.labelSmall.tracking
     }
 }

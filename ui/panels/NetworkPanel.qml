@@ -11,6 +11,9 @@ import "../components"
 // NetworkManager, BlueZ and UPower directly. Nothing here goes through the
 // daemon, because none of it is state the shell owns — it is the machine's
 // state, and the machine already has good ways to ask.
+//
+// The top of the panel is a grid of tiles: one per thing, each saying
+// whether it is live. Underneath them are the lists, which are the detail.
 Item {
     id: panel
 
@@ -41,6 +44,13 @@ Item {
         }
         return list;
     }
+    readonly property var wiredConnected: {
+        for (var i = 0; i < panel.wiredDevices.length; i++) {
+            if (panel.wiredDevices[i].connected)
+                return true;
+        }
+        return false;
+    }
 
     // ---- bluetooth ----
 
@@ -62,63 +72,33 @@ Item {
         note: Networking.wifiEnabled ? "WIFI ON" : "WIFI OFF"
     }
 
-    // ---- the wifi toggle ----
+    // ---- the tiles ----
 
-    Card {
-        id: wifiCard
+    Grid {
+        id: tiles
         anchors.top: header.bottom
         anchors.topMargin: Theme.spacingTight
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: Theme.spacing
         anchors.rightMargin: Theme.spacing
-        height: 44
+        columns: 2
+        columnSpacing: Theme.spacingTight + 2
+        rowSpacing: Theme.spacingTight + 2
 
-        Row {
-            id: wifiRow
-            anchors.fill: parent
-            anchors.margins: Theme.spacingTight + 2
-            spacing: Theme.spacingTight + 2
-
-            Icon {
-                id: wifiIcon
-                anchors.verticalCenter: parent.verticalCenter
-                name: "wifi"
-                width: 16
-                height: 16
-                color: Networking.wifiEnabled ? Theme.toneInfo : Theme.textFaint
-            }
-
-            Column {
-                anchors.verticalCenter: parent.verticalCenter
-                // What the icon and the switch have not claimed, so the
-                // switch sits at the right edge of the card.
-                width: Math.max(0, wifiRow.width - wifiIcon.width
-                    - wifiToggle.width - wifiRow.spacing * 2)
-                spacing: 1
-
-                Text {
-                    width: parent.width
-                    text: "Wi-Fi"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontBody
-                    font.weight: Font.DemiBold
-                }
-
-                Text {
-                    width: parent.width
-                    text: panel.wifiDevices.length > 0
-                        ? panel.wifiDevices.length + " adapter" + (panel.wifiDevices.length > 1 ? "s" : "")
-                        : "no adapter"
-                    color: Theme.textDim
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
-                }
-            }
+        Tile {
+            width: (tiles.width - tiles.columnSpacing) / 2
+            icon: "wifi"
+            label: "Wi-Fi"
+            active: Networking.wifiEnabled
+            detail: panel.wifiDevices.length > 0
+                ? panel.wifiDevices.length + " adapter" + (panel.wifiDevices.length > 1 ? "s" : "")
+                : "no adapter"
 
             Toggle {
                 id: wifiToggle
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.spacingTight + 4
                 anchors.verticalCenter: parent.verticalCenter
                 checked: Networking.wifiEnabled
                 onToggled: function (value) {
@@ -129,6 +109,45 @@ Item {
                         panel.bridge.call("network.wifi", { "enabled": value });
                 }
             }
+
+            trailing: wifiToggle
+        }
+
+        Tile {
+            width: (tiles.width - tiles.columnSpacing) / 2
+            icon: "ethernet"
+            label: "Ethernet"
+            active: panel.wiredConnected
+            detail: panel.wiredDevices.length > 0
+                ? panel.wiredDevices.length + " adapter"
+                : "no adapter"
+        }
+
+        Tile {
+            width: (tiles.width - tiles.columnSpacing) / 2
+            icon: "bluetooth"
+            label: "Bluetooth"
+            active: panel.adapters && panel.adapters.values && panel.adapters.values.length > 0
+                ? panel.adapters.values[0].enabled
+                : false
+            detail: panel.adapters && panel.adapters.values && panel.adapters.values.length > 0
+                ? (panel.adapters.values[0].enabled ? "on" : "off")
+                : "no adapter"
+        }
+
+        Tile {
+            width: (tiles.width - tiles.columnSpacing) / 2
+            icon: "battery"
+            label: "Battery"
+            visible: panel.hasBattery
+            active: panel.hasBattery && panel.battery.percentage >= 20
+            detail: panel.hasBattery
+                ? (panel.battery.state === 1
+                    ? "charging"
+                    : (panel.battery.timeToEmpty > 0
+                        ? Math.round(panel.battery.timeToEmpty / 60) + " min left"
+                        : "on battery"))
+                : ""
         }
     }
 
@@ -136,12 +155,12 @@ Item {
 
     SectionHeader {
         id: networksHeader
-        anchors.top: wifiCard.bottom
+        anchors.top: tiles.bottom
         anchors.topMargin: Theme.spacing
         anchors.left: parent.left
-        anchors.right: parent.right
+        anchors.right: parent.left
+        anchors.rightMargin: parent.width * 0.5
         anchors.leftMargin: Theme.spacing
-        anchors.rightMargin: Theme.spacing
         title: "Networks"
         note: panel.wifiDevices.length > 0 ? "SCAN" : ""
     }
@@ -158,6 +177,7 @@ Item {
         anchors.bottomMargin: Theme.spacing
         clip: true
         spacing: 4
+        visible: panel.wifiDevices.length > 0
 
         model: {
             var list = [];
@@ -178,7 +198,7 @@ Item {
 
             width: networks.width
             height: 34
-            radius: Theme.radiusSmall
+            radius: Theme.radiusMedium
             selected: network.modelData.connected === true
 
             Row {
@@ -193,18 +213,19 @@ Item {
                     width: 14
                     height: 14
                     color: network.modelData.connected === true
-                        ? Theme.toneInfo
-                        : Theme.textFaint
+                        ? Theme.primary
+                        : Theme.onSurfaceVariant
                 }
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.max(0, parent.width - 90)
                     text: network.modelData.name
-                    color: network.modelData.connected === true ? Theme.text : Theme.textDim
+                    color: network.modelData.connected === true ? Theme.onSurface : Theme.onSurfaceVariant
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSmall
-                    font.weight: network.modelData.connected === true ? Font.DemiBold : Font.Normal
+                    font.pixelSize: Theme.type.bodySmall.size
+                    font.weight: Theme.type.bodySmall.weight
+                    font.letterSpacing: Theme.type.bodySmall.tracking
                     elide: Text.ElideRight
                 }
 
@@ -222,8 +243,8 @@ Item {
                             height: 4 + index * 3
                             radius: 1
                             color: index < Math.round((network.modelData.signalStrength || 0) / 34)
-                                ? Theme.toneInfo
-                                : Qt.rgba(1, 1, 1, 0.10)
+                                ? Theme.primary
+                                : Theme.surfaceFillHighest
                         }
                     }
                 }
@@ -251,23 +272,26 @@ Item {
 
     Text {
         anchors.centerIn: networks
-        visible: networks.count === 0
+        visible: panel.wifiDevices.length === 0
         text: "No wifi networks."
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSmall
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
     }
 
     // ---- ethernet ----
 
     SectionHeader {
         id: wiredHeader
-        anchors.top: networksHeader.bottom
+        anchors.top: tiles.bottom
         anchors.topMargin: Theme.spacing
         anchors.left: parent.left
-        anchors.right: parent.left
-        anchors.rightMargin: parent.width * 0.5
-        anchors.leftMargin: Theme.spacing
+        anchors.leftMargin: parent.width * 0.52
+        anchors.right: parent.right
+        anchors.rightMargin: Theme.spacing
+        visible: panel.wiredDevices.length > 0
         title: "Ethernet"
     }
 
@@ -276,11 +300,11 @@ Item {
         anchors.top: wiredHeader.bottom
         anchors.topMargin: Theme.spacingTight
         anchors.left: parent.left
-        anchors.right: parent.left
-        anchors.rightMargin: parent.width * 0.5
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: Theme.spacing
-        anchors.bottomMargin: Theme.spacing
+        anchors.leftMargin: parent.width * 0.52
+        anchors.right: parent.right
+        anchors.rightMargin: Theme.spacing
+        height: Math.min(3, count) * 38
+        visible: panel.wiredDevices.length > 0
         clip: true
         spacing: 4
         model: panel.wiredDevices
@@ -291,7 +315,7 @@ Item {
 
             width: wired.width
             height: 34
-            radius: Theme.radiusSmall
+            radius: Theme.radiusMedium
 
             Row {
                 anchors.fill: parent
@@ -304,39 +328,41 @@ Item {
                     name: "ethernet"
                     width: 14
                     height: 14
-                    color: wire.modelData.connected ? Theme.toneGood : Theme.textFaint
+                    color: wire.modelData.connected ? Theme.toneGood : Theme.onSurfaceVariant
                 }
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.max(0, parent.width - 80)
                     text: wire.modelData.name
-                    color: Theme.text
+                    color: Theme.onSurface
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSmall
+                    font.pixelSize: Theme.type.bodySmall.size
+                    font.weight: Theme.type.bodySmall.weight
+                    font.letterSpacing: Theme.type.bodySmall.tracking
                     elide: Text.ElideRight
                 }
 
                 Chip {
                     anchors.verticalCenter: parent.verticalCenter
                     text: wire.modelData.connected ? "LINK" : "DOWN"
-                    tone: wire.modelData.connected ? Theme.toneGood : Theme.textDim
+                    tone: wire.modelData.connected ? Theme.toneGood : Theme.onSurfaceVariant
                 }
             }
         }
     }
 
-    // ---- bluetooth ----
+    // ---- bluetooth devices ----
 
     SectionHeader {
         id: bluetoothHeader
-        anchors.top: networksHeader.bottom
+        anchors.top: panel.wiredDevices.length > 0 ? wired.bottom : wiredHeader.bottom
         anchors.topMargin: Theme.spacing
         anchors.left: parent.left
         anchors.leftMargin: parent.width * 0.52
         anchors.right: parent.right
         anchors.rightMargin: Theme.spacing
-        title: "Bluetooth"
+        title: "Devices"
         note: panel.adapters && panel.adapters.values && panel.adapters.values.length > 0
             ? (panel.adapters.values[0].enabled ? "ON" : "OFF")
             : "NO ADAPTER"
@@ -371,7 +397,7 @@ Item {
 
             width: bluetoothList.width
             height: 34
-            radius: Theme.radiusSmall
+            radius: Theme.radiusMedium
             selected: device.modelData.connected === true
 
             Row {
@@ -385,16 +411,18 @@ Item {
                     name: "bluetooth"
                     width: 14
                     height: 14
-                    color: device.modelData.connected === true ? Theme.toneInfo : Theme.textFaint
+                    color: device.modelData.connected === true ? Theme.primary : Theme.onSurfaceVariant
                 }
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.max(0, parent.width - 80)
                     text: device.modelData.name ? device.modelData.name : device.modelData.address
-                    color: Theme.text
+                    color: Theme.onSurface
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSmall
+                    font.pixelSize: Theme.type.bodySmall.size
+                    font.weight: Theme.type.bodySmall.weight
+                    font.letterSpacing: Theme.type.bodySmall.tracking
                     elide: Text.ElideRight
                 }
 
@@ -402,9 +430,11 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: device.modelData.batteryAvailable === true
                     text: Math.round(device.modelData.battery) + "%"
-                    color: Theme.textFaint
+                    color: Theme.onSurfaceVariant
                     font.family: Theme.monoFamily
-                    font.pixelSize: Theme.fontTiny
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
                 }
             }
 
@@ -425,72 +455,10 @@ Item {
         anchors.centerIn: bluetoothList
         visible: bluetoothList.count === 0
         text: "No bluetooth devices."
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSmall
-    }
-
-    // ---- battery ----
-
-    Card {
-        id: batteryCard
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.right: parent.left
-        anchors.rightMargin: parent.width * 0.5
-        anchors.leftMargin: Theme.spacing
-        anchors.bottomMargin: Theme.spacing
-        height: 44
-        visible: panel.hasBattery
-
-        Row {
-            anchors.fill: parent
-            anchors.margins: Theme.spacingTight + 2
-            spacing: Theme.spacingTight + 2
-
-            Icon {
-                anchors.verticalCenter: parent.verticalCenter
-                name: "battery"
-                width: 16
-                height: 16
-                color: panel.battery.percentage < 20 ? Theme.toneCritical : Theme.toneGood
-            }
-
-            Column {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 80
-                spacing: 1
-
-                Text {
-                    width: parent.width
-                    text: "Battery"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontBody
-                    font.weight: Font.DemiBold
-                }
-
-                Text {
-                    width: parent.width
-                    text: panel.battery.state === 1
-                        ? "charging"
-                        : (panel.battery.timeToEmpty > 0
-                            ? Math.round(panel.battery.timeToEmpty / 60) + " min left"
-                            : "on battery")
-                    color: Theme.textDim
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
-                }
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: Math.round(panel.battery.percentage) + "%"
-                color: Theme.text
-                font.family: Theme.monoFamily
-                font.pixelSize: Theme.fontBody
-                font.weight: Font.DemiBold
-            }
-        }
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
     }
 }

@@ -92,7 +92,7 @@ Item {
             radius: Theme.radiusSmall
             selected: panel.selectedId === entry.modelData.id
             border.width: panel.selectedId === entry.modelData.id ? 1 : 0
-            border.color: Theme.accent
+            border.color: Theme.primary
 
             Column {
                 anchors.left: parent.left
@@ -105,19 +105,22 @@ Item {
                 Text {
                     width: parent.width
                     text: entry.modelData.title
-                    color: Theme.text
+                    color: Theme.onSurface
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSmall
-                    font.weight: Font.DemiBold
+                    font.pixelSize: Theme.type.bodySmall.size
+                    font.weight: Theme.type.bodySmall.weight
+                    font.letterSpacing: Theme.type.bodySmall.tracking
                     elide: Text.ElideRight
                 }
 
                 Text {
                     width: parent.width
                     text: Format.ago(entry.modelData.updated_at_unix)
-                    color: Theme.textFaint
+                    color: Theme.onSurfaceVariant
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontTiny
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
                 }
             }
 
@@ -133,9 +136,11 @@ Item {
         anchors.centerIn: list
         visible: panel.notes.length === 0
         text: "No notes yet."
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSmall
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
     }
 
     // The editor.
@@ -150,10 +155,10 @@ Item {
         anchors.rightMargin: Theme.spacing
         // The footer lives below the editor, not on top of it.
         anchors.bottomMargin: Theme.spacing + 24
-        color: Theme.well
-        radius: Theme.radiusCard
+        color: Theme.surfaceFillLow
+        radius: Theme.radiusMedium
         border.width: 1
-        border.color: fieldArea.activeFocus ? Theme.accent : Theme.border
+        border.color: fieldArea.activeFocus ? Theme.primary : Theme.outlineVariant
 
         // The note's title.
         Text {
@@ -165,10 +170,11 @@ Item {
             anchors.rightMargin: Theme.spacing
             anchors.topMargin: Theme.spacing
             text: panel.selected ? panel.selected.title : ""
-            color: Theme.text
+            color: Theme.onSurface
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontMedium
-            font.weight: Font.DemiBold
+            font.pixelSize: Theme.type.bodyMedium.size
+            font.weight: Theme.type.bodyMedium.weight
+            font.letterSpacing: Theme.type.bodyMedium.tracking
             elide: Text.ElideRight
         }
 
@@ -182,12 +188,14 @@ Item {
             anchors.rightMargin: Theme.spacing
             anchors.bottom: parent.bottom
             anchors.bottomMargin: Theme.spacing
-            color: Theme.text
+            color: Theme.onSurface
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontBody
+            font.pixelSize: Theme.type.bodySmall.size
+            font.weight: Theme.type.bodySmall.weight
+            font.letterSpacing: Theme.type.bodySmall.tracking
             wrapMode: TextInput.Wrap
             selectByMouse: true
-            selectionColor: Theme.accent
+            selectionColor: Theme.primary
             clip: true
             text: panel.draft
             onTextChanged: {
@@ -205,9 +213,11 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             visible: bodyField.text === "" && panel.selected !== null
             text: "Write something."
-            color: Theme.textFaint
+            color: Theme.onSurfaceVariant
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontBody
+            font.pixelSize: Theme.type.bodySmall.size
+            font.weight: Theme.type.bodySmall.weight
+            font.letterSpacing: Theme.type.bodySmall.tracking
         }
 
         MouseArea {
@@ -234,11 +244,11 @@ Item {
             id: saveState
             anchors.verticalCenter: parent.verticalCenter
             text: panel.dirty ? "UNSAVED" : (panel.selected ? "SAVED" : "")
-            color: panel.dirty ? Theme.toneWarn : Theme.textFaint
+            color: panel.dirty ? Theme.toneWarn : Theme.onSurfaceVariant
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontTiny
-            font.weight: Font.DemiBold
-            font.letterSpacing: 0.8
+            font.pixelSize: Theme.type.labelSmall.size
+            font.weight: Theme.type.labelSmall.weight
+            font.letterSpacing: Theme.type.labelSmall.tracking
         }
 
         Text {
@@ -246,9 +256,11 @@ Item {
             // Whatever the buttons and the save state have not claimed.
             width: Math.max(0, footer.width - saveState.width - footer.spacing)
             text: panel.directory
-            color: Theme.textFaint
+            color: Theme.onSurfaceVariant
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontTiny
+            font.pixelSize: Theme.type.labelSmall.size
+            font.weight: Theme.type.labelSmall.weight
+            font.letterSpacing: Theme.type.labelSmall.tracking
             elide: Text.ElideLeft
         }
     }

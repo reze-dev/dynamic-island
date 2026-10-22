@@ -1,5 +1,7 @@
 import QtQuick
 
+// The focus probe: a strip of text input that can be focused and released,
+// for working out whether the shell is taking the keyboard at all.
 Item {
     id: probe
 
@@ -21,10 +23,10 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: Theme.card
-        radius: 12
-        border.width: 2
-        border.color: probe.hasFocus ? Theme.accent : Theme.border
+        color: Theme.surfaceFill
+        radius: Theme.radiusMedium
+        border.width: 1
+        border.color: probe.hasFocus ? Theme.primary : Theme.outlineVariant
 
         Behavior on border.color {
             ColorAnimation {

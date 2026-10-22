@@ -113,9 +113,9 @@ Item {
                     width: 17
                     height: 17
                     radius: 5
-                    color: tickArea.containsMouse ? Theme.accentDim : "transparent"
+                    color: tickArea.containsMouse ? Theme.primaryDim : "transparent"
                     border.width: 1
-                    border.color: tickArea.containsMouse ? Theme.accent : Theme.borderStrong
+                    border.color: tickArea.containsMouse ? Theme.primary : Theme.outline
 
                     Icon {
                         anchors.centerIn: parent
@@ -123,7 +123,7 @@ Item {
                         name: "check"
                         width: 10
                         height: 10
-                        color: Theme.accent
+                        color: Theme.primary
                     }
 
                     MouseArea {
@@ -150,9 +150,11 @@ Item {
                     Text {
                         width: parent.width
                         text: entry.modelData.text
-                        color: Theme.text
+                        color: Theme.onSurface
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontBody
+                        font.pixelSize: Theme.type.bodySmall.size
+                        font.weight: Theme.type.bodySmall.weight
+                        font.letterSpacing: Theme.type.bodySmall.tracking
                         elide: Text.ElideRight
                     }
 
@@ -164,9 +166,11 @@ Item {
                             + " · " + Format.timeOfDay(entry.modelData.due_unix)
                         color: entry.modelData.due_unix * 1 <= Math.floor(Date.now() / 1000)
                             ? Theme.toneWarn
-                            : Theme.textFaint
+                            : Theme.onSurfaceVariant
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontTiny
+                        font.pixelSize: Theme.type.labelSmall.size
+                        font.weight: Theme.type.labelSmall.weight
+                        font.letterSpacing: Theme.type.labelSmall.tracking
                         elide: Text.ElideRight
                     }
                 }
@@ -189,9 +193,11 @@ Item {
         anchors.centerIn: list
         visible: panel.pending.length === 0
         text: "Nothing on the list."
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontBody
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
     }
 
     // The finished ones, quietly underneath.
@@ -203,13 +209,15 @@ Item {
         anchors.bottomMargin: Theme.spacingTight
         visible: panel.finished.length > 0
         text: panel.finished.length + " done"
-        color: Theme.textFaint
+        color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontTiny
+        font.pixelSize: Theme.type.labelSmall.size
+        font.weight: Theme.type.labelSmall.weight
+        font.letterSpacing: Theme.type.labelSmall.tracking
     }
 
     // The entry field.
-    Rectangle {
+    TextField {
         id: entryField
         anchors.left: parent.left
         anchors.right: parent.right
@@ -217,51 +225,13 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Theme.spacing
         anchors.leftMargin: Theme.spacing
-        height: 34
-        radius: Theme.radiusSmall
-        color: Theme.well
-        border.width: 1
-        border.color: fieldArea.activeFocus ? Theme.accent : Theme.border
-
-        Text {
-            anchors.left: parent.left
-            anchors.leftMargin: Theme.spacingTight + 2
-            anchors.verticalCenter: parent.verticalCenter
-            visible: todoField.text === ""
-            text: "Add a todo — \"standup 15m\""
-            color: Theme.textFaint
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSmall
-        }
-
-        TextInput {
-            id: todoField
-            anchors.left: parent.left
-            anchors.leftMargin: Theme.spacingTight + 2
-            anchors.right: parent.right
-            anchors.rightMargin: Theme.spacingTight
-            anchors.verticalCenter: parent.verticalCenter
-            color: Theme.text
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSmall
-            selectByMouse: true
-            selectionColor: Theme.accent
-            clip: true
-            text: panel.draft
-            onTextChanged: panel.draft = text
-            onAccepted: panel.addTodo()
-            Keys.onEscapePressed: {
-                panel.draft = "";
-                focus = false;
-            }
-        }
-
-        MouseArea {
-            id: fieldArea
-            anchors.fill: parent
-            cursorShape: Qt.IBeamCursor
-            onClicked: todoField.forceActiveFocus()
-        }
+        height: implicitHeight
+        variant: "outlined"
+        placeholder: "Add a todo — \"standup 15m\""
+        text: panel.draft
+        onTextChanged: panel.draft = text
+        onAccepted: panel.addTodo()
+        onEscapePressed: panel.draft = ""
     }
 
     // ---- the pomodoro ----
@@ -276,10 +246,10 @@ Item {
         anchors.rightMargin: Theme.spacing
         anchors.topMargin: Theme.spacing
         anchors.bottomMargin: Theme.spacing
-        color: Theme.card
-        radius: Theme.radiusCard
+        color: Theme.surfaceFill
+        radius: Theme.radiusMedium
         border.width: 1
-        border.color: Theme.border
+        border.color: Theme.outlineVariant
 
         Column {
             anchors.fill: parent
@@ -289,11 +259,11 @@ Item {
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "POMODORO"
-                color: Theme.textFaint
+                color: Theme.onSurfaceVariant
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontTiny
-                font.weight: Font.DemiBold
-                font.letterSpacing: 1.4
+                font.pixelSize: Theme.type.labelSmall.size
+                font.weight: Theme.type.labelSmall.weight
+                font.letterSpacing: Theme.type.labelSmall.tracking
             }
 
             ProgressRing {
@@ -317,9 +287,11 @@ Item {
                 text: panel.timer && panel.timer.rounds_completed !== undefined
                     ? panel.timer.rounds_completed + " rounds done"
                     : ""
-                color: Theme.textFaint
+                color: Theme.onSurfaceVariant
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontTiny
+                font.pixelSize: Theme.type.labelSmall.size
+                font.weight: Theme.type.labelSmall.weight
+                font.letterSpacing: Theme.type.labelSmall.tracking
             }
 
             Row {

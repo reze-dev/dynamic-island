@@ -1,5 +1,10 @@
 import QtQuick
 
+// A styled text input, for when the shell needs to take a line of text.
+//
+// Left over from the focus investigation: it is the smallest thing that can
+// hold a TextInput and be handed a focus, with a placeholder that does not
+// fight the text for room.
 FocusScope {
     id: scope
 
@@ -17,16 +22,19 @@ FocusScope {
         id: input
 
         anchors.fill: parent
-        color: Theme.text
-        font.family: "Inter"
-        font.pixelSize: 15
+        color: Theme.onSurface
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.type.bodyLarge.size
+        font.weight: Theme.type.bodyLarge.weight
+        font.letterSpacing: Theme.type.bodyLarge.tracking
         selectByMouse: true
-        selectionColor: Theme.accent
+        selectionColor: Theme.primaryContainerDim
+        selectedTextColor: Theme.onSurface
         clip: true
 
         onAccepted: scope.submitted(text)
 
-        Keys.onEscapePressed: {
+        Keys.onEscapePressed: (event) => {
             scope.escapePressed();
             event.accepted = true;
         }
@@ -35,7 +43,7 @@ FocusScope {
     Text {
         anchors.fill: parent
         visible: scope.showPlaceholder
-        color: Theme.textDim
+        color: Theme.onSurfaceVariant
         font: input.font
         text: scope.placeholder
     }
