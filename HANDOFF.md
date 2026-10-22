@@ -764,22 +764,41 @@ The live machine found the rest (§4.12).
 ## 9. Open decisions — ask before the relevant phase
 
 1. Adopt a pre-existing default-namespace awww daemon, or always
-   `--namespace isle`? (before Phase 3)
+   `--namespace isle`? — **always `--namespace isle`.** The island starts
+   its own awww daemon in that namespace, so there is exactly one and it
+   cannot collide with anyone else's.
 2. Phase 2 read-only calendar, or defer the whole calendar module to Phase 5?
    — **done, the calendar is implemented.**
 3. Calendar source: own ICS parsing, `khal`, or `vdirsyncer`?
    — **own ICS parsing, done.**
 4. Todos: plain SQLite, or Taskwarrior-compatible export?
+   — **plain SQLite.** The export is a separate job; nothing needs it yet.
 5. Claim `org.freedesktop.Notifications` on day one, or shadow Ryoku's until
    cutover?
+   — **claim it.** Ryoku is gone; the island owns the bus. It asks for the
+   name without queueing, so if something else has taken it, it says so
+   rather than stealing it.
 6. Wallpaper cache cap — 10 GB default, or tune to the actual disk?
-7. Blur on niri: external implementation, or flat styling? — **flat for now.**
+   — **10 GB, and leave it.** It is a ceiling, not a quota.
+7. Blur on niri: external implementation, or flat styling? — **the real
+   thing.** niri 26.04 has `ext-background-effect-v1`, Quickshell 0.3.2 can
+   ask for it, and the island asks (§4.10). The glass is a dark tint over
+   it: the mock's `.88` over a black page, a little less here, because the
+   backdrop is a real screen and not a page.
 8. **Keybind scheme.** `Mod+Ctrl+1..9` + `Mod+Ctrl+J` + `Mod+Ctrl+K`. Decided
    in commit `88e9a4e`; `PLAN.md` and older copies of this file still say
    `Mod+Alt`, which is wrong — `Mod` resolves to Super, and `Mod+Alt` collides
    with Ryoku's move-window-to-workspace.
+   — **still the scheme, and now the only way in.** `Mod+Ctrl+J` is
+   `island.toggle`: the same key opens and closes the island, and it works
+   whether or not the island has the keyboard. The binds exist in
+   `nix/keybinds.nix` and the Michi flake merges them into the niri config,
+   but the config on the machine was built before they did, so the island
+   currently opens by being clicked and nothing else.
 9. **Video wallpapers at all?** awww cannot do it; mpvpaper is a separate
    daemon. Decides whether browser handoff ships.
+   — **not yet.** The browser handoff ships for stills; video is a separate
+   daemon and a separate decision.
 
 ## 10. Honest effort estimate
 
