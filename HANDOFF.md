@@ -338,6 +338,83 @@ compositor-side rule would.
 
 Both limits disappear at Ryoku cutover.
 
+### 4.12 The keyboard, the clicks, and niri's on-demand rule
+
+This is what the first run on a real machine taught us, and it is worth
+more than everything above it. The island ate every click and every
+keystroke, and both faults were the surface's own.
+
+**Niri gives the keyboard to a newly mapped on-demand layer surface.**
+From niri's `src/handlers/layer_shell.rs`, on the commit that maps a
+layer surface:
+
+> Give focus to newly mapped on-demand surfaces. Some launchers like
+> lxqt-runner rely on this behavior. While this behavior doesn't make
+> much sense for other clients like panels, the consensus seems to be
+> that it's not a big deal since panels generally only open once at the
+> start of the session.
+
+It is a big deal for a panel. A surface that is focusable from the start
+takes the keyboard at login and holds it, and niri's focus resolution
+puts the top layer's on-demand surface *above* the focused window, so
+the terminal cannot have it back. And the keyboard only goes back to
+whatever was clicked (`focus_layer_surface_if_on_demand`, in
+`src/input/mod.rs`), so if the surface covers the click, the island
+keeps it forever.
+
+**The clickthrough mask.** `WindowInterface.mask` — inherited by
+`PanelWindow` — sets the input region:
+
+```qml
+PanelWindow {
+    mask: Region {
+        regions: [
+            Region { item: island; radius: island.radius },
+            Region { item: snackbar }
+        ]
+    }
+}
+```
+
+Without it the surface is as wide as the screen and as tall as the
+tallest panel, so every click in that corner belongs to the island
+rather than to the window underneath. With it, a click outside the
+island lands where the reader clicked, and *that* is what returns the
+keyboard.
+
+**What the shell does now.** The surface is focusable only while a
+panel is open, so it never takes the keyboard at startup and a
+notification opening a panel does not take it either. The island asks
+for the keyboard when the panel opens (`onFocusableChanged`), because
+the click that opened it arrived before the window was focusable. The
+panel gives it back when it closes.
+
+On the wire, with `WAYLAND_DEBUG=1`:
+
+```
+zwlr_layer_surface_v1.set_keyboard_interactivity(0)   # startup: none
+zwlr_layer_surface_v1.set_keyboard_interactivity(2)   # a panel opened: on demand
+zwlr_layer_surface_v1.set_keyboard_interactivity(0)   # the panel closed: none
+wl_surface.set_input_region(wl_region#...)            # the island's shape
+```
+
+Quickshell applies the change to a mapped surface, which the layer
+shell protocol says it should not, but wlroots takes it.
+
+**Esc needed the fields to stop eating it.** Every `TextField` consumed
+Esc to clear itself, so a panel with a field in it could not be closed
+at all: the key never reached the island. A field clears itself now,
+and lets the key through when there is nothing left to clear.
+
+**And the fields were bound to a property that typing breaks.** `text:
+panel.filter` plus `onTextChanged: panel.filter = text` looks like a
+two-way binding and is not: the first keystroke removes the binding, and
+from then on the box and the state drift apart. Clearing the state
+cleared the filter but not the box, the todo field showed a task that
+was not there, and picking another note changed the title and left the
+body of the last one on screen. The field is the state now, in all
+three, and they cannot drift apart.
+
 ## 5. What was built, and what it looks like
 
 ### 5.0 The design system — Material 3
@@ -619,6 +696,7 @@ Still open, in this order:
 The UI is Material 3 now (§5.0) and the icons are the Material Symbols
 font. The seeded preview (`just preview-live` — panels with real data in
 them) is what finds layout faults: an empty panel is a forgiving thing.
+The live machine found the rest (§4.12).
 
 **Done:**
 
@@ -646,17 +724,34 @@ them) is what finds layout faults: an empty panel is a forgiving thing.
   "Devices", which is what the Ethernet section is for; it also inherited
   the height of the empty Ethernet section and sat out of line with the
   Networks header beside it; and four panels said "1 ITEMS".
+- **The island ate every click and every keystroke on the real
+  machine.** The surface had no input region, so every click in the top
+  of the desktop was the island's, and niri gives the keyboard to a
+  newly mapped on-demand layer surface, so it took the keyboard at login
+  and held it. Fixed: a clickthrough mask, and focusable only while a
+  panel is open. See §4.12 for the whole story.
+- **The text fields swallowed Esc**, so a panel with a field in it could
+  not be closed at all. And the fields were bound to a property that
+  typing breaks, so clearing the state did not clear the box.
+- The mock's page header is gone: the "ctOS" brand plate and the corner
+  clock. The mock is a demo page with its own system bar; a real desktop
+  already has one, and the island's pill shows the time anyway. The
+  ctOS name is gone from the shell, the mock and the docs; the project
+  is called Dynamic Island.
 
 **Next:**
 
-1. **Put it on the real machine.** `just start`, then
-   `nixos-rebuild switch` and a session restart (§8.11). Everything so
-   far has been the preview rig or a bare `shell.qml`; the island has
-   never run against the real daemon inside the real session, and the
-   top bar and the compositor blur have only been seen over a terminal.
-2. **The focus matrix** (§8.14), which the Material pass made worse:
-   there are three more text fields now, in a window that cannot take
-   compositor focus except by click.
+1. **The focus matrix, properly.** The chain is now right — click the
+   field, type, Esc clears it, Esc closes the panel, and the keyboard
+   goes back to the terminal — but none of it has been tested end to end,
+   because that needs synthetic input and `/dev/uinput` is root-only.
+   `tools/fake-input.py` is the injector, written and ready; it needs
+   `/dev/uinput` to be readable. Everything else about the keyboard is
+   verified from niri's source and on the wire.
+2. **A keybind.** The island opens by being clicked and nothing else.
+   There is no `bind` in the niri config, and no global hotkey, so the
+   only way to open it is the mouse. A key to open it, and the same key
+   to close it, would make the whole thing usable without the mouse.
 3. The media panel has never been photographed with anything in it — it
    reads MPRIS, and there is no fake player the way there is a fake tray
    item. Worth an `examples/fake-mpris.rs`, the way `fake-tray.rs` is
@@ -664,6 +759,7 @@ them) is what finds layout faults: an empty panel is a forgiving thing.
 4. The open decisions in §9 are stale: #1, #4 and #5 are answered by
    code that already exists, and #7 ("Blur on niri: flat for now") is
    wrong — the blur is real (§4.10). Close them out.
+5. Ryoku cutover, which would also lift §4.11's two Quickshell limits.
 
 ## 9. Open decisions — ask before the relevant phase
 
