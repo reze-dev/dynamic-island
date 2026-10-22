@@ -615,6 +615,42 @@ Still open, in this order:
     `compositor=niri` from a systemd unit rather than `unknown`, the unit
     wiring is unproven.
 
+### 8.1 After the Material pass — what is next
+
+The UI is Material 3 now (§5.0) and the icons are the Material Symbols
+font. The seeded preview (`just preview-live` — panels with real data in
+them) found four faults the empty panels had hidden. Fix these first, and
+use the seeded preview as the gate:
+
+| # | Where | Fault |
+|---|---|---|
+| 1 | `ui/panels/CalendarPanel.qml:113` | The empty-state `Text` is anchored to the panel's bottom, and so is the hour `ListView` below it. They overlap: "Nothing scheduled" lands on the 00:00 row. The empty state should replace the list, not sit on it. |
+| 2 | `ui/panels/NotesPanel.qml:88` | The list column is `parent.width * 0.62` from the right — 38% of a 480px panel — so note titles wrap to three lines and overflow their 40px card. Either elide the title or widen the column. |
+| 3 | `ui/panels/NotesPanel.qml:15` | `selectedId` starts empty and nothing selects the first note, so the editor opens as a blank box and the save state is blank. Select the first note when the list arrives. |
+| 4 | `ui/panels/NotificationsPanel.qml` | "Clear all" sits under the right-aligned "3 · 0 new" note rather than beside it. |
+
+Then, in this order:
+
+5. **The snackbar is built and wired to nothing.** `IsledBridge` declares
+   `noticeRaised` and `ui/shell.qml:160` has the bar, but no panel raises
+   one. `clipboard.paste` and the notes save are the callers it wants;
+   add an `announce(message)` helper on the bridge and call it.
+6. `FocusProbe.qml` and `FocusProbeItem.qml` are dead — nothing
+   instantiates them, and `TextField.qml` covers the same ground. Delete
+   them.
+7. **Put it on the real machine.** `just start`, then
+   `nixos-rebuild switch` and a session restart (§8.11). Everything so
+   far has been the preview rig or a bare `shell.qml`; the island has
+   never run against the real daemon inside the real session, and the
+   top bar and the compositor blur have only been seen over a terminal.
+8. **The focus matrix** (§8.14), which the Material pass made worse:
+   there are three more text fields now, in a window that cannot take
+   compositor focus except by click.
+
+The open decisions in §9 are stale: #1, #4 and #5 are answered by code
+that already exists, and #7 ("Blur on niri: flat for now") is wrong —
+the blur is real (§4.10). Close them out.
+
 ## 9. Open decisions — ask before the relevant phase
 
 1. Adopt a pre-existing default-namespace awww daemon, or always
