@@ -97,6 +97,7 @@ impl Domain {
     }
 
     /// Rescan the wallpaper directory without changing it.
+    /// No settings change occurs, so `save_settings()` is not called.
     pub fn rescan_wallpapers(&mut self) {
         let engine = self.wallpaper.engine;
         self.wallpaper = Catalog::scan(&self.settings.wallpaper_dir(), engine);

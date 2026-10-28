@@ -150,12 +150,14 @@ impl Clipboard {
 
     /// Drop unpinned entries beyond the capacity. Pinned entries are exempt,
     /// the same way favourited wallpapers are exempt from pruning.
+    #[allow(unused_variables, unused_assignments)]
     fn prune(&mut self) {
         let capacity = self.capacity;
         if self.items.len() <= capacity {
             return;
         }
         let mut kept = Vec::with_capacity(capacity);
+        #[allow(unused_variables, unused_assignments)]
         let mut dropped = 0;
         for entry in self.items.drain(..) {
             if entry.pinned || kept.len() < capacity {
@@ -165,7 +167,8 @@ impl Clipboard {
             }
         }
         self.items = kept;
-        let _ = dropped;
+        // `dropped` is intentionally not saved; it indicates how many items
+        // were removed by the capacity cap. No persistent action needed.
     }
 }
 
