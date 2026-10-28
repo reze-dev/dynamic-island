@@ -163,8 +163,10 @@ QtObject {
             bridge.activity = data.activity;
         if (data.activities !== undefined)
             bridge.activities = data.activities;
-        if (data.features)
-            bridge.settings = null;
+        // `data.features` indicates daemon capabilities (notifications,
+        // network manager, etc.). Settings are loaded separately and must
+        // not be overwritten by a snapshot — previously this incorrectly
+        // set `bridge.settings = null`.
     }
 
     function handleEvent(topic, data) {
