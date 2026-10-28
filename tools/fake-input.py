@@ -28,11 +28,17 @@ import time
 UI_SET_EVBIT = 0x40045564
 UI_SET_KEYBIT = 0x40045565
 UI_SET_RELBIT = 0x40045566
+UI_SET_ABSBIT = 0x40045567
+UI_SET_PROPBIT = 0x4004556B
 UI_DEV_SETUP = 0x405C5503
+UI_ABS_SETUP = 0x401C5504
+UI_DEV_CREATE = 0x5501
 
 EV_SYN = 0x00
 EV_KEY = 0x01
 EV_ABS = 0x03
+
+INPUT_PROP_DIRECT = 0x01
 
 SYN_REPORT = 0
 ABS_X = 0x00
@@ -75,24 +81,34 @@ class InputId(ctypes.Structure):
     ]
 
 
-class UinputUserDev(ctypes.Structure):
-    _fields_ = [
-        ("id", InputId),
-        ("ff_effects_max", ctypes.c_uint32),
-        ("absmax", ctypes.c_int32 * 64),
-        ("absmin", ctypes.c_int32 * 64),
-        ("absfuzz", ctypes.c_int32 * 64),
-        ("absflat", ctypes.c_int32 * 64),
-        ("keycode", ctypes.c_uint32 * 767),
-        ("scancode", ctypes.c_uint32 * 767),
-    ]
-
-
 class UinputSetup(ctypes.Structure):
+    """The kernel's struct uinput_setup."""
+
     _fields_ = [
         ("id", InputId),
         ("name", ctypes.c_char * 80),
-        ("ud", UinputUserDev),
+        ("ff_effects_max", ctypes.c_uint32),
+    ]
+
+
+class InputAbsinfo(ctypes.Structure):
+    _fields_ = [
+        ("value", ctypes.c_int32),
+        ("minimum", ctypes.c_int32),
+        ("maximum", ctypes.c_int32),
+        ("fuzz", ctypes.c_int32),
+        ("flat", ctypes.c_int32),
+        ("resolution", ctypes.c_uint32),
+    ]
+
+
+class UinputAbsSetup(ctypes.Structure):
+    """The kernel's struct uinput_abs_setup: one axis' worth of range."""
+
+    _fields_ = [
+        ("code", ctypes.c_uint16),
+        ("filler", ctypes.c_uint16),
+        ("absinfo", InputAbsinfo),
     ]
 
 
@@ -114,6 +130,10 @@ class Input:
         fcntl.ioctl(self.fd, UI_SET_EVBIT, EV_KEY)
         fcntl.ioctl(self.fd, UI_SET_EVBIT, EV_SYN)
         fcntl.ioctl(self.fd, UI_SET_EVBIT, EV_ABS)
+        fcntl.ioctl(self.fd, UI_SET_ABSBIT, ABS_X)
+        fcntl.ioctl(self.fd, UI_SET_ABSBIT, ABS_Y)
+        # A direct pointer: the coordinates are the screen's, not deltas.
+        fcntl.ioctl(self.fd, UI_SET_PROPBIT, INPUT_PROP_DIRECT)
         fcntl.ioctl(self.fd, UI_SET_KEYBIT, BTN_LEFT)
         fcntl.ioctl(self.fd, UI_SET_KEYBIT, BTN_RIGHT)
         for code in set(KEYS.values()):
@@ -122,15 +142,19 @@ class Input:
         setup = UinputSetup()
         setup.id = InputId(0x03, 0x1234, 0x5678, 1)
         setup.name = b"isle-fake-input"
+        fcntl.ioctl(self.fd, UI_DEV_SETUP, setup)
+
         # Tenths of a millimetre, the way an absolute pointer usually
         # describes itself, so the compositor can scale it to the output.
-        setup.ud.absmax[ABS_X] = width * 10
-        setup.ud.absmin[ABS_X] = 0
-        setup.ud.absmax[ABS_Y] = height * 10
-        setup.ud.absmin[ABS_Y] = 0
-        for code in set(KEYS.values()):
-            setup.ud.keycode[code] = code
-        fcntl.ioctl(self.fd, UI_DEV_SETUP, setup)
+        for code, extent in ((ABS_X, width), (ABS_Y, height)):
+            axis = UinputAbsSetup()
+            axis.code = code
+            axis.absinfo.minimum = 0
+            axis.absinfo.maximum = extent * 10
+            axis.absinfo.resolution = 10
+            fcntl.ioctl(self.fd, UI_ABS_SETUP, axis)
+
+        fcntl.ioctl(self.fd, UI_DEV_CREATE)
 
         # Give the compositor a moment to notice the device.
         time.sleep(0.3)

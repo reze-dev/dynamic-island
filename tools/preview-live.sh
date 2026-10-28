@@ -118,6 +118,14 @@ if [ -x "$repo/core/target/debug/examples/fake-tray" ]; then
     sleep 2
 fi
 
+# A fake MPRIS player, so the media panel is photographed with something
+# playing rather than the empty state.
+if [ -x "$repo/core/target/debug/examples/fake-mpris" ]; then
+    "$repo/core/target/debug/examples/fake-mpris" --title "Glasshouse" --artist "Aether · Late Night Systems" \
+        >"$seed/mpris.log" 2>&1 &
+    sleep 2
+fi
+
 sleep 1
 
 # ---- the pictures ----

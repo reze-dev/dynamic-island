@@ -171,6 +171,10 @@ in {
   config = lib.mkIf cfg.enable {
     xdg.configFile."quickshell/${quickshellConfigName}".source = cfg.uiPath;
 
+    # Keybinds live immediately (injected into rebuilt config) so the
+    # toggle works without waiting for the user's full system rebuild.
+    xdg.configFile."niri/keybinds.kdl".source = ./keybinds.nix;
+
     # The daemon is also a command. The keybinds run `isled call ...` and
     # the plan wants the same commands to work from a terminal, and neither
     # works if the binary is only in the nix store: the service finds it

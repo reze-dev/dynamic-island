@@ -1126,20 +1126,14 @@ Then run the §5.2 focus matrix on both compositors.
 
 ## 10. Open decisions
 
-1. **awww lifecycle** — confirmed as "we own a namespaced instance" in §9.3.
-   Remaining question: should `isled` *also* adopt a user's pre-existing default
-   awww daemon, or always use `--namespace isle` unconditionally? (§4.4)
+1. ~~**awww lifecycle**~~ — done: always `--namespace isle` (§9.1, §4.4). `isled` starts its own namespaced daemon; no adoption of a pre-existing default.
 2. **Should Phase 2 keep read-only calendar** (as written) or hold the whole
    calendar module for Phase 5?
 3. **Calendar source**: own ICS parsing, `khal`, or `vdirsyncer` first?
-4. **Todos format**: plain SQLite, or Taskwarrior-compatible export?
-5. **Notification daemon**: we are replacing Ryoku's, so the question is
-   narrower than "replace mako/dunst or run alongside" — it is whether to claim
-   `org.freedesktop.Notifications` on day one or shadow Ryoku's until the cutover.
+4. ~~**Todos format**~~ — done: plain JSON (store.rs uses `serde_json`, not SQLite; §9.4, §4.5). Tiny volumes, readable files.
+5. ~~**Notification daemon**~~ — done: claim it (`--claim-notifications`; §9.5, §4.5). Ryoku removed; island asks without queueing.
 6. **Wallpaper cache cap** — 10 GB default, or tune to the target disk?
-7. **Blur strategy.** niri *can* blur (§9.5) — the question is whether to wait for
-   Quickshell to expose `BackgroundEffect`, force a `layer="top"` rule, or ship
-   flat. Not a compositor capability question any more.
+7. ~~**Blur strategy**~~ — done: real blur works (niri 26.04 `ext-background-effect-v1`; Quickshell 0.3.2 exports `BackgroundEffect`; §4.10, §9.7). Glass is dark tint over live backdrop.
 8. ~~**Keybind scheme**~~ — settled: `Mod+Ctrl+1..9` + `Mod+Ctrl+J` +
    `Mod+Ctrl+K`. `Mod+1..9` is taken by workspace switching in both
    compositors, and `Mod+Alt` collides with Ryoku's window moves.
