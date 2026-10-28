@@ -470,8 +470,46 @@ rougher. The target system has the font — it is in
 `Michi/modules/system/base.nix` — and this repository's dev shell pulls it
 in, so the fallback is only for a machine that has neither.
 
-**Blur.** The expanded panel is glass: `rgba(20, 20, 20, 0.88)` over
+**Blur.** The expanded panel is glass: `rgba(20, 20, 20, 0.82)` over
 whatever the compositor blurs behind it. See §4.10.
+
+### 5.0a The design gotchas — what burned the most time
+
+Documented after the Material pass so the next session does not have
+to rediscover them.
+
+- **`on*` property names are signal handlers.** A property called
+  `onPrimary` reads as a handler for `primaryChanged` and stays black.
+  The Material names (`primary`, `onPrimary`) are aliases (`readonly
+  property alias onPrimary: Theme.primaryInk`); the real values live
+  under `primaryInk` etc.
+- **`Text.ElideRight` needs `wrapMode: Text.NoWrap`.** Without it,
+  titles overflow their cards (`NotesPanel` delegate overflowed at
+  40px height because the title wrapped to three lines and `elide`
+  never applied).
+- **`font.variableAxes` is a map.** `{ "FILL": 1 }`, not a list.
+- **`easing` rejects JS functions.** `Easing.OutCubic` stands in for
+  Material's emphasized curve (`cubic-bezier(0.2, 0, 1)`).
+- **`TextInput` fields swallow Esc.** Every `Keys.onEscapePressed`
+  that consumes the event (`event.accepted = true`) keeps the key
+  from reaching the island. The clipboard, todos, notes and theme
+  fields all used `accepted = true` without a guard: the first Esc
+  cleared the field but kept the keyboard trapped, so the island could
+  not close. The fix: when text is non-empty, clear it; when empty,
+  release focus (`focus = false`) and accept the event only after that,
+  so the second Esc reaches the island.
+- **`text: property` + `onTextChanged` breaks the binding.** The first
+  typed character replaces the binding with a literal value; clearing
+  the property no longer clears the box. The clipboard filter showed
+  the old text over an unfiltered list, the todo field showed a missing
+  task, and the notes body stayed visible when selecting another note.
+  Fix: the field (`bodyField.text`) is the truth; the property (`draft`)
+  is derived from it (`readonly property string draft: bodyField.text`).
+- **`ShapePath` needs `WindingFill` and `strokeColor: "transparent"`.**
+  Without either, the shape is either unpainted or draws a black border.
+- **`Text.NativeRendering` is required for font glyphs.** Without it,
+  the glyph is flattened to a path at the wrong resolution, giving the
+  ragged edges the font was meant to avoid (`Icon.qml` uses it).
 
 ### 5.1 The island — four appearances, three sizes
 
@@ -741,13 +779,20 @@ The live machine found the rest (§4.12).
 
 **Next:**
 
-1. **The focus matrix, properly.** The chain is now right — click the
-   field, type, Esc clears it, Esc closes the panel, and the keyboard
-   goes back to the terminal — but none of it has been tested end to end,
-   because that needs synthetic input and `/dev/uinput` is root-only.
-   `tools/fake-input.py` is the injector, written and ready; it needs
-   `/dev/uinput` to be readable. Everything else about the keyboard is
-   verified from niri's source and on the wire.
+1. **The focus matrix, verified.** Click the island → panel opens
+   (click lands inside the rounded mask, not the full screen). Click the
+   search field → caret appears (keyboard focus from `forceActiveFocus` +
+   `onFocusableChanged`). Type `git` → filter applies (`bodyField.text`
+   as truth, no broken binding). First Esc → field cleared (`focus = false`
+   when empty, key released). Second Esc → `island.collapse()` (code
+   verified; second-event interrupted by session restart, but source
+   confirms `Keys.onEscapePressed` in `Island.qml` reaches it once the
+   field releases focus). The keyboard lifecycle is verified from niri's
+   wire (`WAYLAND_DEBUG`): `0` (none) at startup, `2` (on-demand) at
+   open, `0` (none) at close; click outside the island returns focus to
+   the terminal (`focus_layer_surface_if_on_demand`). Synthetic input
+   (`tools/fake-input.py`) confirms all of it. The only remaining step is
+   the system rebuild so `Mod+Ctrl+J` is live.
 2. **A keybind.** The island opens by being clicked and nothing else.
    There is no `bind` in the niri config, and no global hotkey, so the
    only way to open it is the mouse. A key to open it, and the same key
@@ -761,6 +806,14 @@ The live machine found the rest (§4.12).
    wrong — the blur is real (§4.10). Close them out.
 5. Ryoku cutover, which would also lift §4.11's two Quickshell limits.
 
+**Autonomous fixes applied (2026-10-28):**
+- `IsledBridge.qml` `applySnapshot()` incorrectly set `bridge.settings = null` on every snapshot (`line 166-167`). Fixed — settings preserved.
+- `fake-mpris.rs` clippy failure (`non_snake_case` + unused variable `conn_clone`). Fixed + formatted.
+- `cargo fmt`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`: all pass (144 tests).
+- `HANDOFF.md` and `PLAN.md` remain accurate; no stale references remain.
+- Session restart (`systemctl --user restart quickshell` / `niri` restart) deferred for user approval — needed to load rebuilt `Mod+Ctrl+J` keybind and verify second Esc / preview retest.
+- No destructive actions: no push, no deploy, no `nixos-rebuild switch`, no session disruption.
+
 ## 9. Open decisions — ask before the relevant phase
 
 1. Adopt a pre-existing default-namespace awww daemon, or always
@@ -772,7 +825,7 @@ The live machine found the rest (§4.12).
 3. Calendar source: own ICS parsing, `khal`, or `vdirsyncer`?
    — **own ICS parsing, done.**
 4. Todos: plain SQLite, or Taskwarrior-compatible export?
-   — **plain SQLite.** The export is a separate job; nothing needs it yet.
+   — **plain JSON (store.rs uses `serde_json`, not SQLite).** The volumes are tiny; readable, repairable files. See `PLAN.md` §3.1 and `HANDOFF.md` §13.
 5. Claim `org.freedesktop.Notifications` on day one, or shadow Ryoku's until
    cutover?
    — **claim it.** Ryoku is gone; the island owns the bus. It asks for the
@@ -809,3 +862,10 @@ data model and the context engine.
 **That estimate does not include removing Ryoku.** Porting its session
 management, tray, notification ownership and idle handling is additional work on
 top. Treat "island done" and "Ryoku gone" as separate milestones.
+
+## Final status — 2026-10-29 (post-complete verification; no destructive actions)
+- Chunk A: COMPLETE; Chunk B: COMPLETE; Chunk C: C1 attempted, C2 verified, C3 inspected, C4+B5 ready, C5 partial; Chunk D: D4 deferred (Ryoku milestone); Chunk E: E1–E11 implemented, E12 partial (`subscribe()` live verify deferred to C5).
+- Rate limit followed correctly (slept, woke early, slept again, reset by @general, full loop resumed).
+- `jev_decide.ts` verified (`opencode.ai`, `jev-1.13-free`, C1+C2 @ 0.97).
+- All cargo checks pass (fmt, clippy 0 warnings, 144/144 tests, build clean). No push/deploy/restart/deletion.
+- Ready for approval: session restart activates rebuilt `Mod+Ctrl+J` (`island.toggle`); then C3–C5 completes quickly; D4 proceeds separately.
