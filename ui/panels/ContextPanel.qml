@@ -93,6 +93,11 @@ Item {
 
         // ---- what is happening ----
 
+        StaleBanner {
+            width: parent.width
+            bridge: panel.bridge
+        }
+
         SectionHeader {
             width: parent.width
             title: "Happening now"

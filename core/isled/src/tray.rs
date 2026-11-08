@@ -628,8 +628,15 @@ fn sanitize(raw: &str) -> String {
         .to_string()
 }
 
-/// Keep only the newest `keep` BMPs in the pixmap cache.
+/// Pixmap time-to-live: BMPs older than this are evicted regardless of
+/// the shared LRU budget and the newest-N cap.
+const PIXMAP_TTL: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+
+/// Keep only the newest `keep` BMPs in the pixmap cache, and expire
+/// anything older than [`PIXMAP_TTL`] — so a quit app's icon disappears
+/// within a week even when the cache is far under budget.
 fn prune_pixmap_cache(dir: &std::path::Path, keep: usize) {
+    let now = std::time::SystemTime::now();
     let mut files: Vec<(std::time::SystemTime, std::path::PathBuf)> = Vec::new();
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
@@ -643,6 +650,11 @@ fn prune_pixmap_cache(dir: &std::path::Path, keep: usize) {
             .metadata()
             .and_then(|m| m.modified())
             .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        // TTL eviction first: expired files go even when under the cap.
+        if now.duration_since(modified).unwrap_or(Duration::MAX) > PIXMAP_TTL {
+            let _ = std::fs::remove_file(&path);
+            continue;
+        }
         files.push((modified, path));
     }
     files.sort_by_key(|f| f.0);
@@ -751,6 +763,33 @@ mod tests {
             as_pixmap(Value::from(42u32)).is_none(),
             "a u32 is not a pixmap"
         );
+    }
+
+    #[test]
+    fn expired_pixmaps_are_evicted_even_under_the_cap() {
+        let dir = std::env::temp_dir().join(format!("isled-ttl-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let old_path = dir.join("old.bmp");
+        let new_path = dir.join("new.bmp");
+        std::fs::write(&old_path, b"old").unwrap();
+        std::fs::write(&new_path, b"new").unwrap();
+        // Back-date the old file 8 days (past the 7-day TTL). `touch -d`
+        // is coreutils, always present — no extra crate needed.
+        let touched = std::process::Command::new("touch")
+            .arg("-d")
+            .arg("8 days ago")
+            .arg(&old_path)
+            .status()
+            .unwrap();
+        assert!(
+            touched.success(),
+            "touch must be able to back-date the file"
+        );
+        prune_pixmap_cache(&dir, 100);
+        assert!(!old_path.exists(), "the expired BMP must be gone");
+        assert!(new_path.exists(), "the fresh BMP must stay");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

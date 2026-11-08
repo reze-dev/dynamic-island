@@ -12,6 +12,7 @@ Ripple 1.0 Ripple.qml
 SectionHeader 1.0 SectionHeader.qml
 SlideActivity 1.0 SlideActivity.qml
 Snackbar 1.0 Snackbar.qml
+StaleBanner 1.0 StaleBanner.qml
 StateLayer 1.0 StateLayer.qml
 StatTile 1.0 StatTile.qml
 TextField 1.0 TextField.qml

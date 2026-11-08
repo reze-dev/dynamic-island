@@ -76,9 +76,19 @@ Item {
         note: panel.pending.length > 0 ? panel.pending.length + " OPEN" : ""
     }
 
+    StaleBanner {
+        id: staleBanner
+        anchors.top: header.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.rightMargin: parent.width * 0.42
+        anchors.leftMargin: Theme.spacing
+        bridge: panel.bridge
+    }
+
     ListView {
         id: list
-        anchors.top: header.bottom
+        anchors.top: staleBanner.bottom
         anchors.topMargin: Theme.spacingTight
         anchors.left: parent.left
         anchors.right: parent.right

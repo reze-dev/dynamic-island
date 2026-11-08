@@ -112,9 +112,19 @@ Item {
         }
     }
 
+    StaleBanner {
+        id: staleBanner
+        anchors.top: header.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: Theme.spacing
+        anchors.rightMargin: Theme.spacing
+        bridge: panel.bridge
+    }
+
     ListView {
         id: list
-        anchors.top: header.bottom
+        anchors.top: staleBanner.bottom
         anchors.topMargin: Theme.spacing
         anchors.left: parent.left
         anchors.right: parent.right

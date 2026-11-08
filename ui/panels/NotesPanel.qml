@@ -110,9 +110,19 @@ Item {
     }
 
     // The list of notes.
+    StaleBanner {
+        id: staleBanner
+        anchors.top: header.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.rightMargin: parent.width * 0.62
+        anchors.leftMargin: Theme.spacing
+        bridge: panel.bridge
+    }
+
     ListView {
         id: list
-        anchors.top: header.bottom
+        anchors.top: staleBanner.bottom
         anchors.topMargin: Theme.spacingTight
         anchors.left: parent.left
         anchors.right: parent.right

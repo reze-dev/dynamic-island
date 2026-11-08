@@ -37,6 +37,16 @@ Item {
         note: panel.items.length > 0 ? Format.plural(panel.items.length, "item") : ""
     }
 
+    StaleBanner {
+        id: staleBanner
+        anchors.top: header.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: Theme.spacing
+        anchors.rightMargin: Theme.spacing
+        bridge: panel.bridge
+    }
+
     Text {
         anchors.centerIn: parent
         visible: panel.items.length === 0
