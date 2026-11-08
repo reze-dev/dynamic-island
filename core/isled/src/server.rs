@@ -1651,6 +1651,24 @@ impl Server {
                     Err(err) => ServerMessage::reply_err(id, err),
                 }
             }
+            "brightness.get" => match crate::brightness::get_percent() {
+                Ok(percent) => {
+                    ServerMessage::reply_with(id, serde_json::json!({ "percent": percent }))
+                }
+                Err(err) => ServerMessage::reply_err(id, err),
+            },
+            "brightness.set" => {
+                let percent = args
+                    .get("percent")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(50) as u8;
+                match crate::brightness::set_percent(percent) {
+                    Ok(percent) => {
+                        ServerMessage::reply_with(id, serde_json::json!({ "percent": percent }))
+                    }
+                    Err(err) => ServerMessage::reply_err(id, err),
+                }
+            }
 
             "wallpaper.list" => {
                 let domain = self.domain.lock().await;
@@ -1732,6 +1750,23 @@ impl Server {
                 let domain = self.domain.lock().await;
                 ServerMessage::reply_with(id, wallpaper_payload(&domain))
             }
+            "theme.palette" => match crate::palette::extract(
+                &self
+                    .domain
+                    .lock()
+                    .await
+                    .wallpaper
+                    .current
+                    .clone()
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_default(),
+            ) {
+                Some(palette) => ServerMessage::reply_with(
+                    id,
+                    serde_json::to_value(&palette).unwrap_or_default(),
+                ),
+                None => ServerMessage::reply_err(id, "no wallpaper to read a palette from"),
+            },
             "wallpaper.cache" => {
                 let thumb_dir = crate::cache::thumbs_dir();
                 let thumb_entries = crate::cache::list(&thumb_dir);
@@ -2000,6 +2035,15 @@ impl Server {
         if !known && !Path::new(&path).is_file() {
             return ServerMessage::reply_err(id, format!("no such wallpaper: {path}"));
         }
+        // Material palette from the new wallpaper (best-effort, before the
+        // engine apply so it refreshes even when no engine is installed —
+        // the palette is engine-independent, the pixels are not).
+        if let Some(palette) = crate::palette::refresh_from_image(Path::new(&path)) {
+            let _ = self.events.send(ServerMessage::event(
+                "palette.changed",
+                serde_json::to_value(&palette).unwrap_or_default(),
+            ));
+        }
         if let Err(err) = engine.apply(Path::new(&path)) {
             return ServerMessage::reply_err(id, format!("the engine refused the image: {err}"));
         }
@@ -2132,6 +2176,12 @@ impl Server {
         {
             let mut domain = self.domain.lock().await;
             domain.rescan_wallpapers();
+        }
+        if let Some(palette) = crate::palette::refresh_from_image(&path) {
+            let _ = self.events.send(ServerMessage::event(
+                "palette.changed",
+                serde_json::to_value(&palette).unwrap_or_default(),
+            ));
         }
         let _ = self.events.send(ServerMessage::event(
             "wallpaper.changed",

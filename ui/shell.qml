@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Wayland._WlrLayerShell
 import "components"
@@ -19,6 +20,30 @@ PanelWindow {
     color: "transparent"
 
     exclusionMode: ExclusionMode.Ignore
+
+    // The daemon-written material palette (matugen tie-in). Loaded once
+    // at startup and on every change; absent file = built-in theme.
+    property FileView paletteFile: FileView {
+        path: Quickshell.env("XDG_STATE_HOME")
+            ? Quickshell.env("XDG_STATE_HOME") + "/isled/palette.json"
+            : Quickshell.env("HOME") + "/.local/state/isled/palette.json"
+        watchChanges: true
+        onLoaded: root.applyPalette()
+        onFileChanged: root.applyPalette()
+    }
+
+    function applyPalette() {
+        var text = paletteFile.text();
+        if (!text)
+            return;
+        try {
+            var parsed = JSON.parse(text);
+            if (parsed && parsed.surface && parsed.primary && parsed.surface_ink)
+                Theme.matugen = parsed;
+        } catch (err) {
+            // A half-written palette must never break the shell.
+        }
+    }
 
     // The island lives in the topmost (overlay) layer all the time. A normal
     // Top-layer surface can be covered by another overlay (notifications,
@@ -72,6 +97,10 @@ PanelWindow {
     onReducedMotionChanged: Theme.reducedMotion = reducedMotion
     onHighContrastChanged: Theme.highContrast = highContrast
     onMorphDurationChanged: Theme.morphDuration = morphDuration
+    onSchemeChanged: Theme.scheme = scheme === "light" ? "light" : "dark"
+    property string scheme: isled && isled.settings && isled.settings.theme === "light"
+        ? "light"
+        : "dark"
 
     // The clickthrough mask. The surface is as wide as the screen and as
     // tall as the tallest panel, so without a mask every click in that
@@ -196,6 +225,9 @@ PanelWindow {
     Component.onCompleted: {
         Theme.reducedMotion = reducedMotion;
         Theme.highContrast = highContrast;
+        Theme.scheme = (isled.settings && isled.settings.theme === "light")
+            ? "light"
+            : "dark";
         root.isled.call("ping");
     }
 }

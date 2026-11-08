@@ -12,6 +12,10 @@ Item {
     id: panel
 
     property var bridge: null
+    /// The colour scheme name from settings ("dark" or "light").
+    readonly property string scheme: (bridge && bridge.settings && bridge.settings.theme === "light")
+        ? "light"
+        : "dark"
     property string dirDraft: ""
     property bool dirEditing: false
 
@@ -290,6 +294,57 @@ Item {
         }
     }
 
+    // The colour scheme: dark or light. Persisted as settings.theme and
+    // picked up by the shell on the next settings change.
+    Row {
+        id: schemeRow
+        anchors.top: dirCard.bottom
+        anchors.topMargin: Theme.spacingTight
+        anchors.left: parent.left
+        anchors.leftMargin: Theme.spacing
+        spacing: Theme.spacingTight
+
+        Repeater {
+            model: ["dark", "light"]
+            Item {
+                required property var modelData
+                width: 80
+                height: 28
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.radiusSmall
+                    color: panel.scheme === modelData ? Theme.primaryDim : Theme.surfaceFillLow
+                    border.width: 1
+                    border.color: panel.scheme === modelData ? Theme.primary : Theme.outlineVariant
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: modelData === "dark" ? "Dark" : "Light"
+                        color: panel.scheme === modelData ? Theme.primary : Theme.onSurfaceVariant
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.type.labelSmall.size
+                        font.weight: Theme.type.labelSmall.weight
+                        font.letterSpacing: Theme.type.labelSmall.tracking
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        panel.scheme = modelData;
+                        if (panel.bridge)
+                            panel.bridge.callAndSay(
+                                "settings.set",
+                                { "key": "theme", "value": modelData },
+                                modelData === "dark" ? "Dark theme on" : "Light theme on");
+                    }
+                }
+            }
+        }
+    }
+
     function applyDirectory() {
         if (!panel.bridge || !panel.dirEditing)
             return;
@@ -304,7 +359,7 @@ Item {
     // The tabs: Local (the directory above) and Wallhaven (remote).
     Row {
         id: tabs
-        anchors.top: dirCard.bottom
+        anchors.top: schemeRow.bottom
         anchors.topMargin: Theme.spacingTight
         anchors.left: parent.left
         anchors.right: parent.right

@@ -16,6 +16,40 @@ Item {
     readonly property var events: payload && payload.events ? payload.events : []
     readonly property var currentEvent: payload && payload.current ? payload.current : null
 
+    /// "November 2026" — the month the grid below is showing.
+    readonly property var monthTitle: {
+        var now = new Date();
+        var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        return months[now.getMonth()] + " " + now.getFullYear();
+    }
+
+    /// The current month as a 6x7 grid (leading/trailing blanks for
+    /// shape only). Each cell knows its local day number; event dots are
+    /// resolved against `dayEvents` below.
+    readonly property var monthCells: {
+        var now = new Date();
+        var first = new Date(now.getFullYear(), now.getMonth(), 1);
+        var total = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        var cells = [];
+        for (var i = 0; i < first.getDay(); i++)
+            cells.push({ day: 0, today: false, count: 0 });
+        for (var d = 1; d <= total; d++) {
+            var count = 0;
+            for (var j = 0; j < panel.events.length; j++) {
+                var evt = panel.events[j];
+                if (!evt || evt.start_unix === undefined)
+                    continue;
+                var when = new Date(evt.start_unix * 1000);
+                if (when.getDate() === d && when.getMonth() === now.getMonth())
+                    count++;
+            }
+            cells.push({ day: d, today: d === now.getDate(), count: count });
+        }
+        while (cells.length < 42)
+            cells.push({ day: 0, today: false, count: 0 });
+        return cells;
+    }
+
     /// The next fourteen hours, each with the events that fall in it.
     readonly property var hours: {
         var now = Math.floor(Date.now() / 1000);
@@ -121,10 +155,88 @@ Item {
         }
     }
 
+    // The month grid: today's context at a glance. Blanks are pure shape;
+    // a dot means an event starts that day.
+    Item {
+        id: monthSection
+        anchors.top: currentCard.visible ? currentCard.bottom : header.bottom
+        anchors.topMargin: Theme.spacing
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: Theme.spacing
+        anchors.rightMargin: Theme.spacing
+        height: 24 + 22 * 7
+
+        Text {
+            id: monthTitle
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            text: panel.monthTitle
+            color: Theme.onSurface
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.type.labelMedium.size
+            font.weight: Theme.type.labelMedium.weight
+            font.letterSpacing: Theme.type.labelMedium.tracking
+            elide: Text.ElideRight
+        }
+
+        Grid {
+            id: monthGrid
+            anchors.top: monthTitle.bottom
+            anchors.topMargin: 4
+            anchors.left: parent.left
+            anchors.right: parent.right
+            columns: 7
+            columnSpacing: 2
+            rowSpacing: 2
+
+            Repeater {
+                model: panel.monthCells
+
+                Item {
+                    required property var modelData
+                    width: (monthGrid.width - 2 * 6) / 7
+                    height: 22
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 6
+                        color: modelData.today ? Theme.primaryDim : "transparent"
+                        border.width: modelData.today ? 1 : 0
+                        border.color: Theme.primary
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: modelData.day > 0
+                        text: modelData.day
+                        color: modelData.today ? Theme.primary : (modelData.count > 0 ? Theme.onSurface : Theme.onSurfaceVariant)
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.type.labelSmall.size
+                        font.weight: modelData.today ? Theme.type.labelSmall.weight : Theme.type.labelSmall.weight
+                        font.letterSpacing: Theme.type.labelSmall.tracking
+                    }
+
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 2
+                        width: 4
+                        height: 4
+                        radius: 2
+                        visible: modelData.count > 0
+                        color: Theme.primary
+                    }
+                }
+            }
+        }
+    }
+
     Text {
         // In the list's place, not on top of it: an empty day has no hours
         // worth showing, so the empty state takes the whole body.
-        anchors.top: currentCard.visible ? currentCard.bottom : header.bottom
+        anchors.top: monthSection.bottom
         anchors.topMargin: Theme.spacing
         anchors.left: parent.left
         anchors.right: parent.right
@@ -146,7 +258,7 @@ Item {
 
     ListView {
         id: list
-        anchors.top: currentCard.visible ? currentCard.bottom : header.bottom
+        anchors.top: monthSection.bottom
         anchors.topMargin: Theme.spacing
         anchors.left: parent.left
         anchors.right: parent.right

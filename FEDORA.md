@@ -103,7 +103,28 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 | Phase | What is missing |
 |-------|-----------------|
-| 7 | Stagger is wired (30 ms staggered content cross-fades, reduced-motion aware); a11y spans reduced-motion, high-contrast (Theme colors + shell wiring), visible focus ring, away-collapse, screen-reader names, and keyboard-operable buttons. Easing is tokenized end to end (15 sites on `Theme.emphasized/decelerate/accelerate`; no hardcoded `Easing.*` left). Panel fallbacks cover all ten panels with daemon/missing-service naming, action buttons queued offline (persisted to `~/.local/state/isle/queue.json`, capped 100, FIFO flush on reconnect, "N queued items sent" announce), cached-payload staleness banners (`StaleBanner` component in 8 daemon-backed panels, verified by mocked-bridge render), and tray icons resolved through five levels (named path → attention variant → themed fallback → BMP pixmap → title-initial → generic glyph). Tray pixmaps share the wallhaven-thumbnail LRU budget (200 MiB combined) and expire after 7 days. Queue flush ordering is verified (writes flush before reload reads on one stream; reloads observe post-write state — E2E 2026-11-09 with a second seeded todo). Pixmap freshness is verified (in-use icons touched on read, surviving TTL via `an_in_use_pixmap_survives_ttl_by_being_touched`). Tray icon refresh is fixed (`tray.changed` event wired in the bridge + `tray.list` live-owner filter so dead items never surface). Phase 7 items are closed; remaining work is polish only. |
+## What is still missing (vs PLAN.md)
+
+Phase 7 closed above (brightness via `brightnessctl` + panel tile, dark/light
+scheme via `settings.theme` + Theme toggle, calendar month grid with event
+dots, matugen tie-in via `palette.rs` sampled extraction persisted to
+`palette.json` and consumed by `Theme` overrides at startup). Known remains:
+brightness is backlight-only (no DDC — intentional), matugen binary is an
+optional accelerator (sampled path is primary; binary check is a reserved
+hook), the window manager/other-config keybinds and 3-failure backoff are
+NixOS-only paths, and the QuickShell runtime remains Nix-store 0.3.x
+(Fedora 0.2.1 lacks `BackgroundEffect`/`Region.radius` — documented in
+`packaging/fedora.yaml`).
+
+| Phase 7 fallbacks | Done |
+|---|---|
+| Staleness banners | `StaleBanner` in 8 daemon panels (mocked-bridge render). |
+| Palette from wallpaper | `palette.rs` + `palette.json` + Theme overrides; regenerated on set/download, engine-independent; E2E 2026-11-09. |
+| Tray steady state | `owner` in `tray.list`; panel explains Waybar-owned bus vs. claiming. |
+| Dark/light | Theme scheme switch + toggle, persisted as `settings.theme`. |
+| Brightness | `brightnessctl` get/set + NetworkPanel tile; live-verified (45% set → raw 29491). |
+| Calendar | Month grid with today highlight + event dots + agenda. |
+| matugen tie-in | Sampled extraction + persisted JSON + startup Theme override + `theme.palette` command + PATH hook for the binary. |
 | - | System RPM is built and verified (4.3M, `Requires: quickshell >= 0.3.2, mesa-libGL, (awww or hyprpaper), systemd-user`; staged via DNF-downloaded `rpm-build` without root). Runtime quickshell is the Nix store 0.3.2: Fedora's 0.2.1-git was downloaded, extracted, and run — it fails to load the shell at `BackgroundEffect.blurRegion` ("Non-existent attached object") and `Region.radius` ("Cannot assign to non-existent property"), both absent in 0.2.1 qmltypes but present in 0.3.2. The overlay layer itself exists in both, so the blocker is blur glass + rounded masks, not overlay. See `packaging/fedora.yaml` for the qmltypes evidence. Same fallback evidence (170 tests, clippy, lint, overlay) below. |
 
 ## Verified runs

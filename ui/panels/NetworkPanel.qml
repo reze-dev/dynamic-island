@@ -77,6 +77,48 @@ Item {
     readonly property var battery: UPower.displayDevice
     readonly property bool hasBattery: battery && battery.isPresent === true
 
+    // ---- brightness ----
+    // From the daemon (`brightnessctl`); loaded lazily so a machine
+    // without a backlight never blocks the rest of the panel.
+
+    property int brightnessPercent: -1
+    property bool brightnessBusy: false
+
+    Component.onCompleted: {
+        if (panel.bridge)
+            panel.bridge.call("brightness.get", {}, function (ok, payload) {
+                panel.brightnessPercent = ok && payload ? (payload.percent || 0) : -1;
+            });
+    }
+
+    function cycleBrightness() {
+        var steps = [100, 75, 50, 25];
+        var current = panel.brightnessPercent;
+        var next = 100;
+        for (var i = 0; i < steps.length; i++) {
+            if (steps[i] < current) {
+                next = steps[i];
+                break;
+            }
+        }
+        panel.brightnessBusy = true;
+        panel.bridge.call(
+            "brightness.set",
+            { "percent": next },
+            function (ok, payload, error) {
+                panel.brightnessBusy = false;
+                if (ok && payload) {
+                    panel.brightnessPercent = payload.percent;
+                    if (panel.bridge)
+                        panel.bridge.announce("Brightness at " + payload.percent + "%");
+                } else {
+                    var msg = error || "Brightness did not change.";
+                    if (panel.bridge)
+                        panel.bridge.announce(msg);
+                }
+            });
+    }
+
     SectionHeader {
         id: header
         anchors.top: parent.top
@@ -168,6 +210,25 @@ Item {
                         ? Math.round(panel.battery.timeToEmpty / 60) + " min left"
                         : "on battery"))
                 : ""
+        }
+
+        Tile {
+            width: (tiles.width - tiles.columnSpacing) / 2
+            icon: "sun"
+            label: "Brightness"
+            active: panel.brightnessPercent >= 20
+            detail: panel.brightnessBusy
+                ? "setting…"
+                : panel.brightnessPercent >= 0
+                    ? panel.brightnessPercent + "% · tap to step down"
+                    : "no backlight reported"
+
+            MouseArea {
+                anchors.fill: parent
+                enabled: panel.brightnessPercent >= 0 && !panel.brightnessBusy && panel.bridge
+                cursorShape: Qt.PointingHandCursor
+                onClicked: panel.cycleBrightness()
+            }
         }
     }
 

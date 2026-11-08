@@ -31,7 +31,9 @@ QtObject {
 
     /// The accent. A light blue, because Material's dark scheme wants a
     /// primary that is light enough to sit on a dark surface as text.
-    readonly property color primary: Qt.rgba(0.824, 0.890, 1.000)
+    readonly property color primary: matugen
+        ? matugen.primary
+        : Qt.rgba(0.824, 0.890, 1.000)
     /// Text and icons drawn on top of the primary.
     readonly property color primaryInk: Qt.rgba(0.000, 0.196, 0.357)
     readonly property alias onPrimary: theme.primaryInk
@@ -72,26 +74,48 @@ QtObject {
 
     /// The ground the island floats over. The layer shell itself is
     /// transparent, so this is only ever a reference.
-    readonly property color background: Qt.rgba(0, 0, 0)
-    readonly property color backgroundInk: Qt.rgba(0.890, 0.890, 0.890)
-    readonly property alias onBackground: theme.backgroundInk
-    readonly property color surface: Qt.rgba(0.067, 0.075, 0.082)
-    readonly property color surfaceInk: highContrast
-        ? Qt.rgba(1.0, 1.0, 1.0)
+    readonly property color background: light
+        ? Qt.rgba(1, 1, 1)
+        : Qt.rgba(0, 0, 0)
+    readonly property color backgroundInk: light
+        ? Qt.rgba(0.11, 0.11, 0.11)
         : Qt.rgba(0.890, 0.890, 0.890)
+    readonly property alias onBackground: theme.backgroundInk
+    readonly property color surface: matugen
+        ? matugen.surface
+        : (light
+            ? Qt.rgba(0.93, 0.94, 0.96)
+            : Qt.rgba(0.067, 0.075, 0.082))
+    readonly property color surfaceInk: matugen
+        ? matugen.surface_ink
+        : highContrast
+            ? (light ? Qt.rgba(0, 0, 0) : Qt.rgba(1.0, 1.0, 1.0))
+            : (light ? Qt.rgba(0.09, 0.09, 0.10) : Qt.rgba(0.890, 0.890, 0.890))
     readonly property alias onSurface: theme.surfaceInk
     /// The quieter foreground, for the supporting lines and the labels.
     readonly property color surfaceVariant: highContrast
-        ? Qt.rgba(0.84, 0.86, 0.88)
-        : Qt.rgba(0.604, 0.627, 0.647)
+        ? (light ? Qt.rgba(0.2, 0.2, 0.22) : Qt.rgba(0.84, 0.86, 0.88))
+        : (light ? Qt.rgba(0.35, 0.37, 0.40) : Qt.rgba(0.604, 0.627, 0.647))
     readonly property alias onSurfaceVariant: theme.surfaceVariant
     readonly property color surfaceDim: Qt.rgba(0, 0, 0)
-    readonly property color surfaceBright: Qt.rgba(0.204, 0.224, 0.243)
-    readonly property color surfaceContainerLowest: Qt.rgba(0, 0, 0)
-    readonly property color surfaceContainerLow: Qt.rgba(0.043, 0.047, 0.055)
-    readonly property color surfaceContainer: Qt.rgba(0.067, 0.075, 0.082)
-    readonly property color surfaceContainerHigh: Qt.rgba(0.106, 0.114, 0.125)
-    readonly property color surfaceContainerHighest: Qt.rgba(0.141, 0.153, 0.165)
+    readonly property color surfaceBright: light
+        ? Qt.rgba(1, 1, 1)
+        : Qt.rgba(0.204, 0.224, 0.243)
+    readonly property color surfaceContainerLowest: light
+        ? Qt.rgba(1, 1, 1)
+        : Qt.rgba(0, 0, 0)
+    readonly property color surfaceContainerLow: light
+        ? Qt.rgba(0.95, 0.96, 0.98)
+        : Qt.rgba(0.043, 0.047, 0.055)
+    readonly property color surfaceContainer: light
+        ? Qt.rgba(0.93, 0.94, 0.96)
+        : Qt.rgba(0.067, 0.075, 0.082)
+    readonly property color surfaceContainerHigh: light
+        ? Qt.rgba(0.90, 0.92, 0.94)
+        : Qt.rgba(0.106, 0.114, 0.125)
+    readonly property color surfaceContainerHighest: light
+        ? Qt.rgba(0.86, 0.87, 0.90)
+        : Qt.rgba(0.141, 0.153, 0.165)
 
     /// The island's own skin. Nearly, but not entirely, opaque: the
     /// wallpaper should just about show through the expanded panel.
@@ -100,29 +124,43 @@ QtObject {
     /// own black page and the blur is only there to keep the text behind
     /// from being noisy. This one floats over whatever is on the screen,
     /// so it lets a little more through and the blur reads as glass.
-    readonly property color glass: Qt.rgba(0.078, 0.078, 0.078, 0.82)
+    readonly property color glass: light
+        ? Qt.rgba(1, 1, 1, 0.82)
+        : Qt.rgba(0.078, 0.078, 0.078, 0.82)
     /// The idle pill is solid. It is meant to read as a hole in the screen.
-    readonly property color islandSurface: Qt.rgba(0, 0, 0, 0.96)
+    readonly property color islandSurface: light
+        ? Qt.rgba(0.05, 0.05, 0.06, 0.96)
+        : Qt.rgba(0, 0, 0, 0.96)
 
     // ---- colour roles: outlines and fills ----
 
     readonly property color outline: highContrast
-        ? Qt.rgba(0.85, 0.87, 0.90)
-        : Qt.rgba(0.447, 0.471, 0.502)
+        ? (light ? Qt.rgba(0.2, 0.22, 0.26) : Qt.rgba(0.85, 0.87, 0.90))
+        : (light ? Qt.rgba(0.55, 0.57, 0.60) : Qt.rgba(0.447, 0.471, 0.502))
     readonly property color outlineVariant: highContrast
-        ? Qt.rgba(0.65, 0.68, 0.72)
-        : Qt.rgba(0.251, 0.278, 0.302)
+        ? (light ? Qt.rgba(0.45, 0.47, 0.52) : Qt.rgba(0.65, 0.68, 0.72))
+        : (light ? Qt.rgba(0.78, 0.79, 0.82) : Qt.rgba(0.251, 0.278, 0.302))
 
     /// The hairline that edges the expanded panel.
-    readonly property color hairline: Qt.rgba(1, 1, 1, 0.102)
+    readonly property color hairline: light
+        ? Qt.rgba(0, 0, 0, 0.10)
+        : Qt.rgba(1, 1, 1, 0.102)
     /// The fill of a card, a tile, a row.
-    readonly property color surfaceFill: Qt.rgba(1, 1, 1, 0.051)
+    readonly property color surfaceFill: light
+        ? Qt.rgba(0, 0, 0, 0.05)
+        : Qt.rgba(1, 1, 1, 0.051)
     /// The fill under the pointer.
-    readonly property color surfaceFillHover: Qt.rgba(1, 1, 1, 0.071)
+    readonly property color surfaceFillHover: light
+        ? Qt.rgba(0, 0, 0, 0.07)
+        : Qt.rgba(1, 1, 1, 0.071)
     /// The fill of a recessed field: an input, a well.
-    readonly property color surfaceFillLow: Qt.rgba(1, 1, 1, 0.031)
+    readonly property color surfaceFillLow: light
+        ? Qt.rgba(0, 0, 0, 0.03)
+        : Qt.rgba(1, 1, 1, 0.031)
     /// The strongest fill in the set, for tracks and dividers.
-    readonly property color surfaceFillHighest: Qt.rgba(1, 1, 1, 0.102)
+    readonly property color surfaceFillHighest: light
+        ? Qt.rgba(0, 0, 0, 0.10)
+        : Qt.rgba(1, 1, 1, 0.102)
     /// The scrim that goes over a picture when something is said about it.
     readonly property color scrim: Qt.rgba(0, 0, 0, 0.45)
 
@@ -255,6 +293,15 @@ QtObject {
     property bool reducedMotion: false
     /// Boosted text contrast for accessibility.
     property bool highContrast: false
+    /// The colour scheme: "dark" (default) or "light", from
+    /// `settings.theme` via the theme toggle in the wallpaper panel.
+    property string scheme: "dark"
+    readonly property bool light: scheme === "light"
+    /// Material palette derived from the current wallpaper
+    /// (`~/.local/state/isled/palette.json`), or null when no wallpaper
+    /// has been sampled yet. When present it overrides the surface roles
+    /// — the shell's tie-in to the wallpaper.
+    property var matugen: null
     /// How long content takes to fade.
     readonly property int crossfadeDuration: 200
     /// How long content takes to slide. Slightly longer than the morph, so
