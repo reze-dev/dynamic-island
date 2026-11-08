@@ -111,13 +111,18 @@ impl TrayItem {
     /// The file name carries the dimensions and a pixel checksum so a
     /// changed icon gets a new file instead of a stale one.
     fn pixmap_path(&self) -> Option<std::path::PathBuf> {
+        self.pixmap_path_in(&crate::cache::tray_pixmaps_dir())
+    }
+
+    /// Like [`Self::pixmap_path`], but rooted at `dir`. Tests inject a
+    /// temp dir so parallel filters never share the real cache.
+    fn pixmap_path_in(&self, dir: &std::path::Path) -> Option<std::path::PathBuf> {
         let (w, h, pixels) = self.icon_pixmap.as_ref()?;
         let bytes = bmp_bytes(*w, *h, pixels)?;
         let checksum: u64 = pixels
             .iter()
             .fold(0u64, |acc, p| acc.wrapping_add(*p as u64));
-        let dir = crate::cache::tray_pixmaps_dir();
-        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::create_dir_all(dir);
         let slug = sanitize(&format!(
             "{}-{}-{}-{:x}",
             self.service, self.id, self.title, checksum
@@ -127,8 +132,15 @@ impl TrayItem {
         if existing != bytes {
             let _ = std::fs::write(&path, &bytes);
         }
+        // Touch the file on every read so a live item's pixmap is always
+        // fresh and survives TTL eviction and the newest-N cap by merit of
+        // use, not by bytes alone: an unchanged icon is still an in-use
+        // icon, and an unchanged icon's age must not count against it.
+        if let Ok(file) = std::fs::File::open(&path) {
+            let _ = file.set_modified(std::time::SystemTime::now());
+        }
         // Tray pixmaps are tiny; keep the cache from growing without bound.
-        prune_pixmap_cache(&dir, 100);
+        prune_pixmap_cache(dir, 100);
         path.is_file().then_some(path)
     }
 }
@@ -742,14 +754,17 @@ mod tests {
         item.icon = String::new();
         item.attention_icon = String::new();
         item.icon_pixmap = Some((1, 1, vec![0xFF112233]));
-        // The payload renders into the real cache dir; assert the file is
-        // a BMP, then clean it up so the test never pollutes the session.
-        let payload = item.payload();
-        let path = payload["icon_path"].as_str().unwrap().to_string();
+        // Isolated dir: no shared state with other filters.
+        let dir = std::env::temp_dir().join(format!("isled-pixmap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = item
+            .pixmap_path_in(&dir)
+            .expect("a pixmap renders to a BMP");
         let bytes = std::fs::read(&path).unwrap();
         assert_eq!(&bytes[0..2], b"BM");
         assert_eq!(bytes.len(), 14 + 40 + 4);
-        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -763,6 +778,36 @@ mod tests {
             as_pixmap(Value::from(42u32)).is_none(),
             "a u32 is not a pixmap"
         );
+    }
+
+    #[test]
+    fn an_in_use_pixmap_survives_ttl_by_being_touched() {
+        let mut item = item("Active");
+        item.icon = String::new();
+        item.attention_icon = String::new();
+        item.icon_pixmap = Some((1, 1, vec![0xFF334455]));
+        // Isolated dir: no shared state with other filters.
+        let dir = std::env::temp_dir().join(format!("isled-fresh-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // First render creates the BMP.
+        let path = item.pixmap_path_in(&dir).expect("first render");
+        assert!(path.exists());
+        // Back-date it past the TTL, then re-render the SAME item.
+        std::process::Command::new("touch")
+            .arg("-d")
+            .arg("8 days ago")
+            .arg(&path)
+            .status()
+            .unwrap();
+        // Without a touch this would already be TTL-expired.
+        let _ = item.pixmap_path_in(&dir);
+        prune_pixmap_cache(&dir, 100);
+        assert!(
+            path.exists(),
+            "an in-use pixmap touched on read must survive TTL eviction"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

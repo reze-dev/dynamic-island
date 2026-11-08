@@ -535,8 +535,13 @@ QtObject {
     function onConnected() {
         bridge.pendingText = "";
         bridge.consumed = 0;
-        bridge.reloadAll();
+        // Flush queued writes BEFORE the reload reads. The bridge sends on
+        // one stream and the server dispatches in stream order, so a read
+        // issued after the writes observes post-write state — a read
+        // issued before would return the pre-write snapshot and the UI
+        // would show stale state until the next refresh.
         var sent = bridge.flushQueue();
+        bridge.reloadAll();
         if (sent > 0) {
             bridge.announce(sent + " queued item" + (sent === 1 ? "" : "s") + " sent.");
         }
