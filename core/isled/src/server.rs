@@ -170,6 +170,9 @@ impl Server {
         let supervisor = Arc::clone(&self);
         tokio::spawn(async move { supervisor.supervise_compositor().await });
 
+        let context = Arc::clone(&self);
+        tokio::spawn(async move { context.watch_context_signals().await });
+
         // The clipboard history fills itself up, if there is a way to watch
         // the clipboard.
         if let Some(mut selections) = crate::clipwatch::spawn(crate::clipwatch::watch_dir()) {
@@ -635,6 +638,251 @@ impl Server {
 
     async fn sample(&self) -> SystemStats {
         self.stats.lock().await.sample()
+    }
+
+    /// Slow poll for the D-Bus world: logind idle, UPower battery,
+    /// NetworkManager degradation, PipeWire meeting streams. Each of these
+    /// is read at most once every 10s; the fast compositor loop in
+    /// `poll_sway` handles the screen. Changes fold into the context and
+    /// surface as island activities (idle hints, low battery, meetings).
+    async fn watch_context_signals(&self) {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(10));
+        loop {
+            ticker.tick().await;
+            let now = unix_now();
+
+            // logind idle
+            let idle = crate::context_signals::read_logind_idle()
+                .await
+                .or_else(crate::context_signals::read_logind_idle_fallback);
+            {
+                let mut domain = self.domain.lock().await;
+                let changed = crate::context_signals::fold_logind(
+                    &mut domain.context,
+                    idle,
+                    None,
+                    now,
+                );
+                if changed && domain.context.state == isle_core::ContextState::Away {
+                    let _ = self.events.send(ServerMessage::event(
+                        "context.changed",
+                        serde_json::to_value(&domain.context).unwrap_or_default(),
+                    ));
+                }
+            }
+
+            // UPower battery
+            let battery = crate::context_signals::read_upower_battery()
+                .await
+                .or_else(crate::context_signals::read_upower_battery_fallback);
+            if let Some((percent, charging)) = battery {
+                let changed = {
+                    let mut domain = self.domain.lock().await;
+                    crate::context_signals::fold_battery(
+                        &mut domain.context,
+                        Some(percent),
+                        Some(charging),
+                        now,
+                    )
+                };
+                if changed && !charging && percent <= 20 {
+                    self.trigger_activity(
+                        ActivityKind::LowBattery,
+                        format!("Battery at {percent}%"),
+                        if percent <= 10 {
+                            "Plug the charger in".into()
+                        } else {
+                            "Consider plugging in".into()
+                        },
+                        ActivityTone::Critical,
+                        "bolt",
+                        8_000,
+                        true,
+                        Some("upower".to_string()),
+                    )
+                    .await;
+                }
+            }
+
+            // NetworkManager degradation
+            let degraded = crate::context_signals::read_nm_degraded()
+                .await
+                .or_else(crate::context_signals::read_nm_degraded_fallback);
+            if let Some(degraded) = degraded {
+                let changed = {
+                    let mut domain = self.domain.lock().await;
+                    crate::context_signals::fold_network(&mut domain.context, Some(degraded), now)
+                };
+                if changed && degraded {
+                    self.trigger_activity(
+                        ActivityKind::Network,
+                        "Connection is struggling".to_string(),
+                        "NetworkManager reports degraded connectivity".into(),
+                        ActivityTone::Warn,
+                        "wifi_off",
+                        6_000,
+                        false,
+                        Some("nm".to_string()),
+                    )
+                    .await;
+                }
+            }
+
+            // Fullscreen from the compositor.
+            let fullscreen = self
+                .compositor_info
+                .lock()
+                .await
+                .as_ref()
+                .and_then(|i| i.focused_window.as_ref())
+                .map(|w| w.fullscreen)
+                .unwrap_or(false);
+            {
+                let mut domain = self.domain.lock().await;
+                crate::context_signals::fold_fullscreen(&mut domain.context, fullscreen, now);
+            }
+
+            // Meeting heuristics: compositor title + PipeWire node scan.
+            let (title, app_id) = self
+                .compositor_info
+                .lock()
+                .await
+                .as_ref()
+                .and_then(|i| i.focused_window.clone())
+                .map(|w| (w.title, w.app_id))
+                .unwrap_or_default();
+            let title_cloned = title.clone();
+            let app_cloned = app_id.clone();
+            crate::context_signals::fold_meeting(
+                &mut self.domain.lock().await.context,
+                &title_cloned,
+                &app_cloned,
+                now,
+            );
+            if crate::context_signals::pipewire_has_meeting_stream() {
+                let mut domain = self.domain.lock().await;
+                let changed = domain.context.fold(
+                    &isle_core::Signal::Meeting {
+                        title: "PipeWire meeting stream".into(),
+                    },
+                    now,
+                );
+                if changed {
+                    self.trigger_activity(
+                        ActivityKind::Meeting,
+                        "Meeting stream detected".to_string(),
+                        "PipeWire reports a meeting app".into(),
+                        ActivityTone::Critical,
+                        "video",
+                        8_000,
+                        true,
+                        Some("pipewire".to_string()),
+                    )
+                    .await;
+                }
+            }
+
+            // Calendar soon (next 10 minutes).
+            {
+                let (upcoming, calendar_title) = {
+                    let domain = self.domain.lock().await;
+                    let calendar = domain.calendar();
+                    let events = calendar.upcoming(now as i64);
+                    let first = events.first();
+                    (
+                        first.map(|e| e.start_unix).unwrap_or(0),
+                        first.map(|e| e.summary.clone()).unwrap_or_default(),
+                    )
+                };
+                if upcoming > 0 {
+                    let seconds = upcoming - now as i64;
+                    if (0..=600).contains(&seconds) {
+                        let mut domain = self.domain.lock().await;
+                        let changed = crate::context_signals::fold_calendar(
+                            &mut domain.context,
+                            &calendar_title,
+                            seconds,
+                            now,
+                        );
+                        if changed {
+                            self.trigger_activity(
+                                ActivityKind::Meeting,
+                                calendar_title.clone(),
+                                if seconds <= 60 {
+                                    "starting now".into()
+                                } else {
+                                    format!("starts in {}m", seconds / 60)
+                                },
+                                ActivityTone::Warn,
+                                "event",
+                                6_000,
+                                false,
+                                Some("calendar".to_string()),
+                            )
+                            .await;
+                        }
+                    }
+                }
+            }
+
+            // Todo due (next 5 minutes).
+            {
+                let (next_due, next_text) = {
+                    let domain = self.domain.lock().await;
+                    let next = domain.todos.next_upcoming();
+                    (
+                        next.as_ref().map(|t| t.due_unix.unwrap_or(0)),
+                        next.map(|t| t.text.clone()).unwrap_or_default(),
+                    )
+                };
+                if let Some(due) = next_due {
+                    if due > 0 && (0..=300).contains(&(due as i64 - now as i64)) {
+                        let mut domain = self.domain.lock().await;
+                        let changed = crate::context_signals::fold_todo(
+                            &mut domain.context,
+                            &next_text,
+                            now,
+                        );
+                        if changed {
+                            self.trigger_activity(
+                                ActivityKind::Todo,
+                                next_text.clone(),
+                                "due soon".into(),
+                                ActivityTone::Warn,
+                                "check",
+                                6_000,
+                                false,
+                                Some("todo".to_string()),
+                            )
+                            .await;
+                        }
+                    }
+                }
+            }
+
+            // Clipboard burst: the clipwatch already fills the history;
+            // a burst is >5 changes in the last minute. Computed from
+            // the clipboard ledger — no extra I/O.
+            {
+                let domain = self.domain.lock().await;
+                let now_sec = now;
+                let recent: u32 = domain
+                    .clipboard
+                    .items
+                    .iter()
+                    .filter(|i| now_sec.saturating_sub(i.created_at_unix) < 60)
+                    .count() as u32;
+                if recent > 5 {
+                    let _ = self.events.send(ServerMessage::event(
+                        "context.changed",
+                        serde_json::json!({
+                            "state": "busy",
+                            "burst": recent,
+                        }),
+                    ));
+                }
+            }
+        }
     }
 
     async fn handle_connection(&self, stream: UnixStream) {
@@ -1595,8 +1843,30 @@ impl Server {
                         "wallpaper": wallpaper_payload(&domain),
                         "settings": domain.settings,
                         "compositor": compositor,
+                        "context": domain.context,
                     }),
                 )
+            }
+            "context.signal" => {
+                let signal = isle_core::Signal::from_map(&args);
+                match signal {
+                    Some(signal) => {
+                        let mut domain = self.domain.lock().await;
+                        let changed = domain.context.fold(&signal, unix_now());
+                        let context = domain.context.clone();
+                        if changed {
+                            let _ = self.events.send(ServerMessage::event(
+                                "context.changed",
+                                serde_json::to_value(&context).unwrap_or_default(),
+                            ));
+                        }
+                        ServerMessage::reply_with(
+                            id,
+                            serde_json::to_value(&context).unwrap_or_default(),
+                        )
+                    }
+                    None => ServerMessage::reply_err(id, "unknown signal: missing kind"),
+                }
             }
             "compositor.info" => {
                 let info = self.compositor_info.lock().await.clone();

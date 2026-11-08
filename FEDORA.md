@@ -30,6 +30,16 @@
   The server supervises streams with 2 s reconnect backoff, applies focus
   events as island activities, and exposes `compositor.info` /
   `context.summary` `compositor`.
+- **Phase 6 context engine** works: `isle-core/src/context.rs`
+  (`Signal` → `Context` reducer, `score`/`suggest`/`is_quiet`, meeting
+  heuristics) and `isled/src/context_signals.rs` (logind idle via
+  Z-Bus + `loginctl`, UPower battery via Z-Bus + `upower`,
+  NetworkManager degraded via Z-Bus + `nmcli`, PipeWire node scan,
+  compositor fullscreen + title heuristics, calendar <10 min, todos
+  <5 min, clipboard burst). `Domain.context` is folded every 10 s by
+  `watch_context_signals`, surfaces as island activities (low battery,
+  degraded network, meeting detected), and is queryable via
+  `context.summary/context` and injectable via `context.signal`.
 - **Browser handoff** works: `isled/src/handoff.rs` polls `~/Downloads`
   in the 1 s pulse, waits out partial writes, rejects video, imports
   images into the catalog, and emits `wallpaper.changed` +
@@ -93,8 +103,7 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 | Phase | What is missing |
 |-------|-----------------|
-| 4 | Pending-link UI in the theme panel (daemon side done); LRU pruning of the downloaded cache |
-| 6 | logind Idle/LockHint, UPower low-battery, PipeWire screencast meeting detection, network-quality and clipboard-burst signals, reducer + scorer |
+| 4 | LRU pruning of the downloaded cache |
 | 7 | Idle/low-power behavior, animation tuning, a11y, fallbacks for missing services (no NM, no BT daemon, no MPRIS player, no wallpaper engine — some of these already degrade honestly in the UI) |
 | - | `quickshell` on Fedora still comes from the Nix store via `install-units`; there is no standalone `.deb/.rpm` path (the HM module is NixOS-only by design) |
 
@@ -110,4 +119,9 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
   `workspaces=[{name:1, focused:true, output:eDP-1}, {name:2, focused:false}]`.
   `context.summary` now includes the same `compositor` block.
 - `core/target/debug/isled call wallpaper.handoff-status` → `{"dir":"/home/asuna/Downloads","pending":0}`.
+- `core/target/debug/isled call context.signal '{"kind":"idle","idle":true}'` →
+  `{"state":"away","last_title":"The machine is idle"}`;
+  `context.signal '{"kind":"battery","percent":15,"charging":false}'` →
+  `{"state":"low-battery","last_title":"Battery at 15%"}`.
+  `context.summary` now also carries `"context": {…}`.
 - `grim` screenshot shows the idle pill (dot + clock) at the top centre.

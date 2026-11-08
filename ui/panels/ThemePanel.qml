@@ -24,6 +24,10 @@ Item {
     property bool whLoading: false
     property string whError: ""
     property string whQuery: ""
+    // The handoff tab: the daemon watches ~/Downloads and imports saves.
+    property string handoffDir: ""
+    property int handoffPending: 0
+    property string handoffUrl: ""
     property Timer whDebounce: Timer {
         id: whTimer
         interval: 400
@@ -47,6 +51,22 @@ Item {
                     panel.whLastPage = payload.last_page || 1;
                 } else {
                     panel.whError = error || "Wallhaven is unreachable.";
+                }
+            });
+    }
+
+    function handoffStatus() {
+        if (!panel.bridge || panel.tab !== "imported")
+            return;
+        panel.bridge.call(
+            "wallpaper.handoff-status",
+            {},
+            function (ok, payload, error) {
+                if (ok && payload) {
+                    panel.handoffDir = payload.dir || "";
+                    panel.handoffPending = payload.pending || 0;
+                } else {
+                    panel.whError = error || "The handoff watcher is unreachable.";
                 }
             });
     }
@@ -282,7 +302,7 @@ Item {
         spacing: Theme.spacingTight
 
         Repeater {
-            model: ["local", "wallhaven"]
+            model: ["local", "wallhaven", "imported"]
             Item {
                 required property var modelData
                 required property int index
@@ -298,7 +318,7 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: modelData === "local" ? "Local" : "Wallhaven"
+                        text: modelData === "local" ? "Local" : (modelData === "wallhaven" ? "Wallhaven" : "Imported")
                         color: panel.tab === modelData ? Theme.primary : Theme.onSurfaceVariant
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.type.labelSmall.size
@@ -314,6 +334,8 @@ Item {
                         panel.tab = modelData;
                         if (modelData === "wallhaven" && panel.whItems.length === 0 && !panel.whLoading)
                             panel.whSearch();
+                        if (modelData === "imported")
+                            panel.handoffStatus();
                     }
                 }
             }
@@ -322,7 +344,7 @@ Item {
         TextField {
             id: whSearchField
             anchors.verticalCenter: parent.verticalCenter
-            width: tabs.width - 90 * 2 - Theme.spacingTight * 2
+            width: tabs.width - 90 * 3 - Theme.spacingTight * 3
             placeholder: "Search wallhaven…"
             visible: panel.tab === "wallhaven"
             onTextChanged: {
@@ -331,6 +353,29 @@ Item {
             }
             onEscapePressed: {
                 if (text !== "") text = "";
+            }
+        }
+
+        TextField {
+            id: handoffUrlField
+            anchors.verticalCenter: parent.verticalCenter
+            width: tabs.width - 90 * 3 - Theme.spacingTight * 3
+            placeholder: "Paste a page URL to open…"
+            visible: panel.tab === "imported"
+            onTextChanged: {
+                panel.handoffUrl = text;
+            }
+            onEscapePressed: {
+                if (text !== "") text = "";
+            }
+            onAccepted: {
+                if (panel.bridge && text.trim() !== "") {
+                    panel.bridge.callAndSay(
+                        "wallpaper.handoff-open",
+                        { "url": text.trim() },
+                        "Opened — save to Downloads",
+                        "Could not open that page");
+                }
             }
         }
     }
@@ -349,7 +394,11 @@ Item {
         anchors.rightMargin: Theme.spacing
         anchors.bottomMargin: Theme.spacing
         contentWidth: width
-        contentHeight: (panel.tab === "wallhaven" ? whGrid.height : grid.height) + (panel.tab === "wallhaven" ? 36 : 0)
+        contentHeight: {
+            if (panel.tab === "imported")
+                return 90;
+            return (panel.tab === "wallhaven" ? whGrid.height : grid.height) + (panel.tab === "wallhaven" ? 36 : 0);
+        }
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
@@ -614,11 +663,55 @@ Item {
             font.pixelSize: Theme.type.labelSmall.size
             font.weight: Theme.type.labelSmall.weight
         }
+
+        Column {
+            visible: panel.tab === "imported"
+            anchors.centerIn: parent
+            spacing: Theme.spacingTight
+            width: parent.width - Theme.spacing * 2
+
+            Text {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                text: panel.handoffPending > 0
+                    ? "Waiting for a save… " + panel.handoffPending + " pending"
+                    : "Save a wallpaper to Downloads — the daemon imports it."
+                color: Theme.onSurfaceVariant
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.type.bodySmall.size
+                font.weight: Theme.type.bodySmall.weight
+                font.letterSpacing: Theme.type.bodySmall.tracking
+            }
+
+            Text {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                text: panel.handoffDir ? panel.handoffDir : "Watching ~/Downloads"
+                color: Theme.onSurfaceVariant
+                font.family: Theme.monoFamily
+                font.pixelSize: Theme.type.labelSmall.size
+                font.weight: Theme.type.labelSmall.weight
+                font.letterSpacing: Theme.type.labelSmall.tracking
+            }
+
+            Text {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                text: panel.handoffPending > 0
+                    ? panel.handoffPending + " file(s) to import"
+                    : "Videos are not imported — the engine cannot draw them."
+                color: Theme.onSurfaceVariant
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.type.labelSmall.size
+                font.weight: Theme.type.labelSmall.weight
+                font.letterSpacing: Theme.type.labelSmall.tracking
+            }
+        }
     }
 
     Text {
         anchors.centerIn: scroller
-        visible: panel.items.length === 0
+        visible: panel.tab === "local" && panel.items.length === 0
         text: "No images in that directory."
         color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily

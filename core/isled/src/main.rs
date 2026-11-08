@@ -6,6 +6,7 @@
 #[allow(dead_code)]
 mod clipwatch;
 mod compositor;
+mod context_signals;
 mod data;
 mod domain;
 mod handoff;

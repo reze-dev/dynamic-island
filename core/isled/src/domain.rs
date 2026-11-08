@@ -26,7 +26,24 @@ pub struct Domain {
     pub clipboard: Clipboard,
     pub wallpaper: Catalog,
     pub activities: ActivityQueue,
+    pub context: isle_core::Context,
     store: Store,
+}
+
+impl Default for Domain {
+    fn default() -> Self {
+        Self {
+            settings: Settings::default(),
+            todos: TodoList::default(),
+            timer: TimerState::default(),
+            notes: NoteStore::new(Settings::default().notes_dir()),
+            clipboard: Clipboard::default(),
+            wallpaper: Catalog::default(),
+            activities: ActivityQueue::new(),
+            context: isle_core::Context::default(),
+            store: Store::new(),
+        }
+    }
 }
 
 impl Domain {
@@ -48,6 +65,7 @@ impl Domain {
             clipboard,
             wallpaper,
             activities: ActivityQueue::new(),
+            context: isle_core::Context::default(),
             settings,
             store,
         }
