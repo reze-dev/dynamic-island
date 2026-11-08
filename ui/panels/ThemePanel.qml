@@ -148,7 +148,7 @@ Item {
                 icon: "refresh"
                 size: 28
                 tooltip: "Pick a random wallpaper"
-                enabled: panel.bridge && panel.bridge.connected
+                enabled: panel.bridge
                 onClicked: panel.bridge
                     ? panel.bridge.callAndSay("wallpaper.next", {}, "New wallpaper")
                     : null
@@ -160,7 +160,7 @@ Item {
                 size: 28
                 active: panel.loopOn
                 tooltip: panel.loopOn ? "Stop the rotation" : "Rotate every minute"
-                enabled: panel.bridge && panel.bridge.connected
+                enabled: panel.bridge
                 onClicked: panel.bridge
                     ? panel.bridge.callAndSay("wallpaper.loop", {
                         "enabled": !panel.loopOn,

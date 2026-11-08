@@ -103,7 +103,7 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 | Phase | What is missing |
 |-------|-----------------|
-| 7 | Stagger is wired (30 ms staggered content cross-fades, reduced-motion aware); a11y spans reduced-motion, high-contrast (Theme colors + shell wiring), visible focus ring, away-collapse, screen-reader names, and keyboard-operable buttons. Easing is tokenized end to end (15 sites on `Theme.emphasized/decelerate/accelerate`; no hardcoded `Easing.*` left). Panel fallbacks cover all ten panels with daemon/missing-service naming, with stiffer enforcement (action buttons disable when the daemon is unreachable). Tray launcher icons: named → file path → attention variant → title-initial fallback → generic glyph. Still open: stiffer per-panel fallbacks beyond disabling actions (e.g. queued offline intents), and launcher-icon coverage for pixmap payloads beyond the initial-letter stand-in. |
+| 7 | Stagger is wired (30 ms staggered content cross-fades, reduced-motion aware); a11y spans reduced-motion, high-contrast (Theme colors + shell wiring), visible focus ring, away-collapse, screen-reader names, and keyboard-operable buttons. Easing is tokenized end to end (15 sites on `Theme.emphasized/decelerate/accelerate`; no hardcoded `Easing.*` left). Panel fallbacks cover all ten panels with daemon/missing-service naming, action buttons queued offline (capped 100, FIFO flush on reconnect, "N queued items sent" announce), and tray icons resolved through five levels (named path → attention variant → themed fallback → BMP pixmap → title-initial → generic glyph). Still open: queue persistence across a UI restart (in-memory only), and pixmap LRU budget beyond the 100-file cap. |
 | - | System RPM is built and verified (4.3M, `Requires: quickshell >= 0.3.2, mesa-libGL, (awww or hyprpaper), systemd-user`; staged via DNF-downloaded `rpm-build` without root). Runtime quickshell is the Nix store 0.3.2: Fedora's 0.2.1-git was downloaded, extracted, and run — it fails to load the shell at `BackgroundEffect.blurRegion` ("Non-existent attached object") and `Region.radius` ("Cannot assign to non-existent property"), both absent in 0.2.1 qmltypes but present in 0.3.2. The overlay layer itself exists in both, so the blocker is blur glass + rounded masks, not overlay. See `packaging/fedora.yaml` for the qmltypes evidence. Same fallback evidence (170 tests, clippy, lint, overlay) below. |
 
 ## Verified runs
@@ -128,6 +128,18 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
   `wallpaper.prune` → `{"removed":0}`. The cache honors
   `settings.cache_max_bytes` (default 200 MiB) and prunes LRU after every
   search. The old `/tmp` path is gone.
+- Tray pixmap icons: `tray.rs` reads the `IconPixmap` property (32×32
+  ARGB32, capped 256×256), renders 32-bpp BMPs to
+  `~/.cache/isled/tray-pixmaps/` (100-file cap, newest kept), and the
+  panel resolves named → attention → themed → BMP → title-initial →
+  generic glyph. Verified by 4 new daemon tests (`bmp_bytes_has_a_bmp_header_and_right_size`,
+  `a_pixmap_only_item_gets_a_bmp_icon_path` — writes a real BMP then
+  removes it, leaving the cache clean).
+- Offline queue: `IsledBridge.call()` queues while disconnected (cap
+  100, oldest dropped with `lastError`), `flushQueue()` sends FIFO on
+  reconnect preserving ids, `callAndSay` announces "Queued — will send
+  when isled is back." and "N queued items sent." on flush. Buttons
+  re-enabled (previous disable gates removed) since intents now queue.
 - `just package-fedora` → `/tmp/isle-fedora.tar.gz` (4.3 MB, no sudo
   needed to install — `install.sh` writes user-local units).
 - System path staged: `DESTDIR=/tmp/opencode/isle-system-test bash

@@ -60,6 +60,14 @@ QtObject {
     property var pending: ({})
     property int pendingBytes: 0
 
+    /// Commands sent while the daemon is unreachable are queued here and
+    /// flushed, in order, when the socket comes back. The queue is capped
+    /// so an offline afternoon cannot grow it without bound; the oldest
+    /// intents are dropped first.
+    property var queued: []
+    property int queuedCount: 0
+    property int queuedCap: 100
+
     // ---- signals ----
 
     signal viewRequested(int index)
@@ -274,6 +282,10 @@ QtObject {
     // ---- sending ----
 
     /// Send a command. The optional callback receives (ok, data, error).
+    /// While the daemon is unreachable the command is queued and returns
+    /// its id immediately; the callback still fires when the queue
+    /// flushes after a reconnect. Queueing is capped: past queuedCap the
+    /// oldest intents are dropped and lastError says so.
     function call(name, args, onReply) {
         var id = bridge.nextId;
         bridge.nextId = bridge.nextId + 1;
@@ -283,6 +295,15 @@ QtObject {
         var message = { "t": "cmd", "id": id, "name": name };
         if (args !== undefined && args !== null)
             message.args = args;
+        if (!bridge.connected) {
+            bridge.queued.push(message);
+            if (bridge.queued.length > bridge.queuedCap) {
+                var dropped = bridge.queued.shift();
+                bridge.lastError = "queued too many commands — dropped " + dropped.name;
+            }
+            bridge.queuedCount = bridge.queued.length;
+            return id;
+        }
         try {
             bridge.socket.write(JSON.stringify(message) + "\n");
             bridge.socket.flush();
@@ -292,15 +313,42 @@ QtObject {
         return id;
     }
 
+    /// Flush the offline queue, oldest first, preserving ids so pending
+    /// callbacks still match.
+    function flushQueue() {
+        var sent = 0;
+        var left = [];
+        for (var i = 0; i < bridge.queued.length; i++) {
+            var message = bridge.queued[i];
+            try {
+                bridge.socket.write(JSON.stringify(message) + "\n");
+                bridge.socket.flush();
+                sent++;
+            } catch (err) {
+                // The socket died mid-flush: keep the rest queued.
+                for (var j = i; j < bridge.queued.length; j++)
+                    left.push(bridge.queued[j]);
+                bridge.lastError = "could not send " + message.name + ": " + err;
+                break;
+            }
+        }
+        bridge.queued = left;
+        bridge.queuedCount = left.length;
+        return sent;
+    }
+
     /// Say something to the user. The shell shows it in the snackbar.
     function announce(message, action) {
         bridge.noticeRaised(message, action === undefined ? "" : action);
     }
 
     /// Send a command and say what came of it. The message is only said
-    /// when the daemon answers; a command that never gets an answer says
-    /// nothing, because the truth is not known yet.
+    /// when the daemon answers; a command queued offline announces that
+    /// it is queued, so the user knows the intent was kept.
     function callAndSay(name, args, said, failure) {
+        if (!bridge.connected) {
+            bridge.announce("Queued — will send when isled is back.");
+        }
         bridge.call(name, args, function (ok, payload, error) {
             if (ok) {
                 if (said)
@@ -400,6 +448,10 @@ QtObject {
         bridge.pendingText = "";
         bridge.consumed = 0;
         bridge.reloadAll();
+        var sent = bridge.flushQueue();
+        if (sent > 0) {
+            bridge.announce(sent + " queued item" + (sent === 1 ? "" : "s") + " sent.");
+        }
     }
 
     function onDisconnected() {

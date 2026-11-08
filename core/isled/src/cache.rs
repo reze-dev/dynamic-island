@@ -18,10 +18,20 @@ use std::time::{Duration, SystemTime};
 /// `~/.cache`, and never to `/tmp` (which a tmp-cleaner may wipe out
 /// from under the panel).
 pub fn thumbs_dir() -> PathBuf {
+    cache_root().join("wallhaven-thumbs")
+}
+
+/// The tray pixmap directory: BMP renderings of StatusNotifier pixmaps,
+/// one file per item. Same XDG discipline as the thumbnails.
+pub fn tray_pixmaps_dir() -> PathBuf {
+    cache_root().join("tray-pixmaps")
+}
+
+fn cache_root() -> PathBuf {
     if let Some(dir) = std::env::var_os("XDG_CACHE_HOME").filter(|v| !v.is_empty()) {
-        return PathBuf::from(dir).join("isled").join("wallhaven-thumbs");
+        return PathBuf::from(dir).join("isled");
     }
-    home_dir().join(".cache/isled/wallhaven-thumbs")
+    home_dir().join(".cache/isled")
 }
 
 fn home_dir() -> PathBuf {

@@ -52,6 +52,10 @@ pub struct TrayItem {
     pub icon: String,
     /// The icon to draw when the item wants attention.
     pub attention_icon: String,
+    /// A pixmap icon `(width, height, ARGB32 pixels)` when the item
+    /// offers one instead of (or alongside) a name. Rendered to a BMP
+    /// cache file for the panel when no named icon resolves.
+    pub icon_pixmap: Option<(u32, u32, Vec<u32>)>,
     /// The tooltip, if the item has one.
     pub tooltip: String,
     /// Whether a click should open a menu rather than do something.
@@ -78,14 +82,18 @@ impl TrayItem {
         let icon = self.effective_icon();
         // The attention icon is often not in the theme, and the ordinary one
         // is a better answer than nothing at all.
-        let path = crate::icons::find(icon).or_else(|| {
-            let other = if icon == self.icon {
-                &self.attention_icon
-            } else {
-                &self.icon
-            };
-            crate::icons::find(other)
-        });
+        let path = crate::icons::find(icon)
+            .or_else(|| {
+                let other = if icon == self.icon {
+                    &self.attention_icon
+                } else {
+                    &self.icon
+                };
+                crate::icons::find(other)
+            })
+            // Pixmap-only items have no name to resolve; render the
+            // ARGB32 payload to a BMP cache file the panel can load.
+            .or_else(|| self.pixmap_path());
         serde_json::json!({
             "id": self.id,
             "title": self.title,
@@ -97,6 +105,31 @@ impl TrayItem {
             "is_menu": self.is_menu,
             "service": self.service,
         })
+    }
+
+    /// Render this item's pixmap to a BMP cache file, if it has one.
+    /// The file name carries the dimensions and a pixel checksum so a
+    /// changed icon gets a new file instead of a stale one.
+    fn pixmap_path(&self) -> Option<std::path::PathBuf> {
+        let (w, h, pixels) = self.icon_pixmap.as_ref()?;
+        let bytes = bmp_bytes(*w, *h, pixels)?;
+        let checksum: u64 = pixels
+            .iter()
+            .fold(0u64, |acc, p| acc.wrapping_add(*p as u64));
+        let dir = crate::cache::tray_pixmaps_dir();
+        let _ = std::fs::create_dir_all(&dir);
+        let slug = sanitize(&format!(
+            "{}-{}-{}-{:x}",
+            self.service, self.id, self.title, checksum
+        ));
+        let path = dir.join(format!("{slug}-{w}x{h}.bmp"));
+        let existing = std::fs::read(&path).unwrap_or_default();
+        if existing != bytes {
+            let _ = std::fs::write(&path, &bytes);
+        }
+        // Tray pixmaps are tiny; keep the cache from growing without bound.
+        prune_pixmap_cache(&dir, 100);
+        path.is_file().then_some(path)
     }
 }
 
@@ -348,10 +381,11 @@ async fn read_item(connection: &zbus::Connection, service: &str) -> Option<TrayI
     let attention_icon = get("AttentionIconName")
         .and_then(as_string)
         .unwrap_or_default();
+    let icon_pixmap = get("IconPixmap").and_then(as_pixmap);
     let is_menu = get("ItemIsMenu").and_then(as_bool).unwrap_or(false);
     let tooltip = get("ToolTip").map(tooltip_text).unwrap_or_default();
 
-    if id.is_empty() && title.is_empty() && icon.is_empty() {
+    if id.is_empty() && title.is_empty() && icon.is_empty() && icon_pixmap.is_none() {
         return None;
     }
 
@@ -362,6 +396,7 @@ async fn read_item(connection: &zbus::Connection, service: &str) -> Option<TrayI
         category,
         icon,
         attention_icon,
+        icon_pixmap,
         tooltip,
         is_menu,
         service: service.to_string(),
@@ -499,6 +534,124 @@ fn as_bool(value: Value) -> Option<bool> {
     }
 }
 
+/// A StatusNotifier pixmap: `(width, height, ARGB32 pixels)`.
+/// Validated and capped so a hostile item cannot allocate unboundedly.
+fn as_pixmap(value: Value) -> Option<(u32, u32, Vec<u32>)> {
+    let Value::Structure(fields) = value else {
+        return None;
+    };
+    let fields = fields.fields();
+    if fields.len() < 3 {
+        return None;
+    }
+    let width = as_u32(fields[0].clone())?;
+    let height = as_u32(fields[1].clone())?;
+    if width == 0 || height == 0 || width > 256 || height > 256 {
+        return None;
+    }
+    let pixels = as_u32_array(fields[2].clone())?;
+    if pixels.len() != (width as usize) * (height as usize) {
+        return None;
+    }
+    Some((width, height, pixels))
+}
+
+fn as_u32(value: Value) -> Option<u32> {
+    match value {
+        Value::U32(v) => Some(v),
+        Value::I32(v) => u32::try_from(v).ok(),
+        _ => None,
+    }
+}
+
+fn as_u32_array(value: Value) -> Option<Vec<u32>> {
+    match value {
+        Value::Array(array) => array
+            .inner()
+            .iter()
+            .map(|item| as_u32(item.clone()))
+            .collect(),
+        _ => None,
+    }
+}
+
+/// Encode ARGB32 pixels as a 32-bpp BMP (bottom-up BGRA rows). Qt loads
+/// BMP with the plugins it definitely has, so no PNG crate is needed.
+pub fn bmp_bytes(width: u32, height: u32, pixels: &[u32]) -> Option<Vec<u8>> {
+    if width == 0 || height == 0 || pixels.len() != (width as usize) * (height as usize) {
+        return None;
+    }
+    let w = width as usize;
+    let h = height as usize;
+    let row_bytes = w * 4;
+    let pixel_bytes = row_bytes * h;
+    let file_size = 14 + 40 + pixel_bytes;
+    let mut out = Vec::with_capacity(file_size);
+    out.extend_from_slice(b"BM");
+    out.extend_from_slice(&(file_size as u32).to_le_bytes());
+    out.extend_from_slice(&[0, 0, 0, 0]);
+    out.extend_from_slice(&54u32.to_le_bytes()); // pixel offset
+    // BITMAPINFOHEADER, height negative = top-down (simpler row order).
+    out.extend_from_slice(&40u32.to_le_bytes());
+    out.extend_from_slice(&(width as i32).to_le_bytes());
+    out.extend_from_slice(&(-(height as i32)).to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes()); // planes
+    out.extend_from_slice(&32u16.to_le_bytes()); // bpp
+    out.extend_from_slice(&0u32.to_le_bytes()); // compression: BI_RGB
+    out.extend_from_slice(&(pixel_bytes as u32).to_le_bytes());
+    out.extend_from_slice(&2835i32.to_le_bytes()); // 72 DPI X
+    out.extend_from_slice(&2835i32.to_le_bytes()); // 72 DPI Y
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+    for &px in pixels {
+        // ARGB32 → BGRA byte order.
+        out.push((px & 0xFF) as u8); // B
+        out.push(((px >> 8) & 0xFF) as u8); // G
+        out.push(((px >> 16) & 0xFF) as u8); // R
+        out.push(((px >> 24) & 0xFF) as u8); // A
+    }
+    Some(out)
+}
+
+/// A filesystem-safe slug from an item's identity.
+fn sanitize(raw: &str) -> String {
+    raw.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string()
+}
+
+/// Keep only the newest `keep` BMPs in the pixmap cache.
+fn prune_pixmap_cache(dir: &std::path::Path, keep: usize) {
+    let mut files: Vec<(std::time::SystemTime, std::path::PathBuf)> = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("bmp") {
+            continue;
+        }
+        let modified = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        files.push((modified, path));
+    }
+    files.sort_by_key(|f| f.0);
+    let excess = files.len().saturating_sub(keep);
+    for (_, path) in files.into_iter().take(excess) {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
 /// The text of a tooltip, which is a structure of an icon name, a pixmap and
 /// two strings.
 fn tooltip_text(value: Value) -> String {
@@ -532,6 +685,7 @@ mod tests {
             category: "ApplicationStatus".into(),
             icon: "app-icon".into(),
             attention_icon: "app-attention".into(),
+            icon_pixmap: None,
             tooltip: String::new(),
             is_menu: false,
             service: ":1.1".into(),
@@ -549,6 +703,54 @@ mod tests {
     #[test]
     fn a_passive_item_keeps_its_own_icon() {
         assert_eq!(item("Passive").effective_icon(), "app-icon");
+    }
+
+    #[test]
+    fn bmp_bytes_has_a_bmp_header_and_right_size() {
+        // 2x1 ARGB (opaque red, opaque green).
+        let pixels = [0xFFFF0000u32, 0xFF00FF00u32];
+        let bytes = bmp_bytes(2, 1, &pixels).unwrap();
+        assert_eq!(&bytes[0..2], b"BM");
+        assert_eq!(bytes.len(), 14 + 40 + 8);
+        // First pixel is opaque red → BGRA bytes.
+        let off = 54;
+        assert_eq!(&bytes[off..off + 4], &[0x00, 0x00, 0xFF, 0xFF]);
+        assert_eq!(&bytes[off + 4..off + 8], &[0x00, 0xFF, 0x00, 0xFF]);
+    }
+
+    #[test]
+    fn bmp_bytes_rejects_mismatched_dimensions() {
+        assert!(bmp_bytes(2, 2, &[1, 2, 3]).is_none());
+        assert!(bmp_bytes(0, 1, &[]).is_none());
+    }
+
+    #[test]
+    fn a_pixmap_only_item_gets_a_bmp_icon_path() {
+        let mut item = item("Active");
+        item.icon = String::new();
+        item.attention_icon = String::new();
+        item.icon_pixmap = Some((1, 1, vec![0xFF112233]));
+        // The payload renders into the real cache dir; assert the file is
+        // a BMP, then clean it up so the test never pollutes the session.
+        let payload = item.payload();
+        let path = payload["icon_path"].as_str().unwrap().to_string();
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(&bytes[0..2], b"BM");
+        assert_eq!(bytes.len(), 14 + 40 + 4);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn pixmap_parsing_caps_dimensions() {
+        // Garbage is rejected, not allocated for.
+        assert!(
+            as_pixmap(Value::from("not a pixmap")).is_none(),
+            "a string is not a pixmap"
+        );
+        assert!(
+            as_pixmap(Value::from(42u32)).is_none(),
+            "a u32 is not a pixmap"
+        );
     }
 
     #[test]
