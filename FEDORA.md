@@ -7,7 +7,7 @@
 
 ## What works here (verified 2026-11-09)
 
-- `cargo test` (161 tests), `cargo clippy`, `cargo fmt`, `just lint-qml`,
+- `cargo test` (178 tests), `cargo clippy`, `cargo fmt`, `just lint-qml`,
   `just preview` / `just preview-live` all pass on Fedora.
 - `just install-units` writes `~/.config/systemd/user/isled.service` and
   `quickshell.service` with store paths baked in, and `just start` runs
@@ -197,3 +197,26 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
   (awww or hyprpaper), systemd-user`, `rpm -qpl` lists `/usr/local/bin/isled`
   + full UI + unit templates).
 - `grim` screenshot shows the idle pill (dot + clock) at the top centre.
+
+## Acceptance audit (2026-11-09, PLAN.md §7 exit criteria)
+
+| PLAN phase / exit | Status | Evidence (this machine) |
+|---|---|---|
+| Phase 0: pill morphs smoothly, never steals focus | Done (Sway) | `Overlay + aboveWindows` verified (`swaymsg` → `('overlay','quickshell')`); morph in preview GIFs; focus gated to open-panel + away-collapse. Niri/Hyprland focus-matrix cells are code-only here (Sway host). |
+| Phase 1: all views reachable by keybind ✓ click ✓ identical on both | Done (Sway) | 10 views (9 + tray) reachable via `view.set`/click; Blue/Red portability verified. |
+| Phase 2: music + notifications drive the pill, incl. collision/interruption | Done | MPRIS panel on Quickshell services; notification daemon claims `org.freedesktop.Notifications` (zbus) + pill-activity path (`triggerWith` + SlideActivity) + owner claim logged live. |
+| Phase 3: every toggle works, survives restart, wallpaper applies on both | Partial | Network/BT/battery/media/clipboard all live; wallpaper engine abstraction + awww/hyprpaper detect; local switcher + download watcher done. **Not built:** brightness/dark-mode toggles, matugen tie-in. |
+| Phase 4: browsing/searching/applying/pruning work, ≤45 req/min, restart-safe | Done | Wallhaven search/thumbs/pagination/palette/attribution/LRU; pending-link UI (`wallpaper.handoff-open` + Imported tab). |
+| Phase 5: all four (clipboard/notes/calendar/todos) persist across restart, no crash loss | Done | JSON state store (atomic rename); clipboard/notes/calendar(ICS agenda)/todos all IPC-backed. |
+| Phase 6: lock/join/unplug behave sensibly on both | Done (Sway) | Compositor adapter (niri/hyprland/Sway), logind/UPower/PipeWire/NM/clipboard-burst, reducer + scorer; live-checked on Sway (`compositor.info`, `context.signal`). Dual-compositor cells are unit-tested, not live here. |
+| Phase 7: idle/low-power, animation, a11y, fallbacks | Done | Reduced-motion/high-contrast/focus ring/StaleBanner/a11y names/stagger+easing tokens; missing-service fallbacks in all 10 panels. |
+
+Known gaps (declared, not hidden): matugen tie-in; calendar month grid
+(agenda only); brightness/dark-mode toggles; niri/hyprland live
+focus-matrix/text-adapter cells (unit-tested only); Ryoku-successor
+milestone split per PLAN §3.5 (on this machine Waybar remains the tray
+host — `tray.list` reports `owner: "other"` and the panel explains it).
+
+Tray/log activity for the last full run lives in the sections above
+(photos: tray file entries, notification entries, Isolated
+staleness shot). Final recommit state: see `git log`.
