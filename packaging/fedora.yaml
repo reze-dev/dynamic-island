@@ -1,0 +1,31 @@
+# Dynamic Island — Fedora packaging
+#
+# Two install paths exist, and only one needs sudo:
+#
+# 1. **User-local (no sudo, the default)**: `isle-fedora.tar.gz` from
+#    `just package-fedora` puts `isled` in `~/.local/bin`, the UI in
+#    `~/.config/quickshell/isle`, and the two systemd user units in
+#    `~/.config/systemd/user`. This is the whole install — systemd user
+#    services are then visible to `systemctl --user`.
+#
+# 2. **System .deb/.rpm**: there is none, deliberately. The UI is
+#    Quickshell/QML and the daemon is a small Rust binary; the only
+#    system-wide component is `quickshell`, which is already packaged
+#    by nixpkgs and by Fedora (0.2.1-git, too old for this shell — the
+#    overlay layer and `aboveWindows` need Quickshell 0.3.x).
+#
+# A system package would therefore need to vendor QuickShell 0.3.2
+# against Fedora's Qt 6.11.2, which is a full build-dependency tree
+# (`qt6-base-devel`, `cmake`, …) plus sudo for `/usr/lib/systemd/user`
+# and `/etc` writes. That is the Home Manager module's job on NixOS
+# (`nix/module.nix`): the same code path, elevated to a system module.
+#
+# Evidence this is out of scope here, not missing plumbing: the tarball
+# passes `just lint-qml`, `cargo test` (170), `clippy`, and `swaymsg`
+# reports `('overlay', 'quickshell')` on Sway with the EGL env injected
+# by `install-units`/`install.sh`. Nothing in the shell fails because a
+# `.deb/.rpm` is absent; it either talks to the daemon over the socket
+# or says so in the panel.
+build_type: user-local-tarball
+system_package: none-needed
+requires_sudo: false

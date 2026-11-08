@@ -199,6 +199,18 @@ Item {
         font.letterSpacing: Theme.type.bodySmall.tracking
     }
 
+    Text {
+        anchors.centerIn: list
+        anchors.verticalCenterOffset: 18
+        visible: panel.timer !== null && panel.timer.phase === "idle"
+        text: "The clock is idle — press play to start a pomodoro."
+        color: Theme.onSurfaceVariant
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.type.labelSmall.size
+        font.weight: Theme.type.labelSmall.weight
+        font.letterSpacing: Theme.type.labelSmall.tracking
+    }
+
     // The finished ones, quietly underneath.
     Text {
         id: doneLabel

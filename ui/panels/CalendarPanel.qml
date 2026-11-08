@@ -123,7 +123,7 @@ Item {
         anchors.leftMargin: Theme.spacing
         anchors.rightMargin: Theme.spacing
         visible: panel.events.length === 0 && panel.currentEvent === null
-        text: "Nothing scheduled. Point the calendar at a directory of .ics files."
+        text: "Nothing scheduled today — that's a good day. Drop .ics files in the calendar directory."
         color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
         font.pixelSize: Theme.type.bodySmall.size

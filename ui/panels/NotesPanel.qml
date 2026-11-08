@@ -182,7 +182,7 @@ Item {
     Text {
         anchors.centerIn: list
         visible: panel.notes.length === 0
-        text: "No notes yet."
+        text: "No notes yet. Hit + to write one."
         color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
         font.pixelSize: Theme.type.bodySmall.size

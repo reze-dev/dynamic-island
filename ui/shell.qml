@@ -40,6 +40,15 @@ PanelWindow {
     property bool highContrast: bridge.settings
         && bridge.settings.high_contrast === true
 
+    // The morph duration the daemon resolved for the shell, straight
+    // from settings — so `settings.set '{"key":"morph_duration_ms",…}'`
+    // actually changes the feel without a rebuild.
+    property int morphDuration: (bridge.settings
+        && bridge.settings.morph_duration_ms !== undefined
+        && bridge.settings.morph_duration_ms > 0)
+        ? bridge.settings.morph_duration_ms
+        : Theme.morphDuration
+
     // The keyboard belongs to the island only while a panel is open.
     //
     // Niri hands the keyboard to a newly mapped on-demand layer surface, so

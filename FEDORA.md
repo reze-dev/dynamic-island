@@ -103,8 +103,8 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 | Phase | What is missing |
 |-------|-----------------|
-| 7 | Phase 7 polish now covers: reduced-motion, high-contrast, visible focus ring, away-collapse, morph duration from settings, and panel fallbacks (NetworkManager daemon, Bluetooth daemon, MPRIS player, wallpaper engine down — each now names the missing service rather than rendering blank). Still open: deeper animation tuning beyond token defaults, and per-panel missing-service fallbacks beyond Network/MPRIS (e.g. no MPRIS shows a hint row; wallpaper engine down already falls back to the catalog) |
-| - | `quickshell` on Fedora still comes from the Nix store via `install-units` or the `isle-fedora.tar.gz` tarball; there is no standalone `.deb/.rpm` path (the HM module is NixOS-only by design) |
+| 7 | Animation tuning beyond token defaults (morph duration is now settings-tunable, `settings.set '{"key":"morph_duration_ms","value":700}'`; stagger token exists at 30 ms but is not yet wired into content cross-fades), a11y beyond reduced-motion/high-contrast/focus ring/away-collapse, and per-panel missing-service fallbacks beyond Network/MPRIS/Todos/Calendar/Notes (e.g. no MPRIS shows a hint row; wallpaper engine down already falls back to the catalog) |
+| - | `quickshell` on Fedora still comes from the Nix store via `install-units` or the `isle-fedora.tar.gz` tarball; there is no standalone `.deb/.rpm` path (the HM module is NixOS-only by design). `packaging/fedora.yaml` documents why this is out of scope: no system component requires sudo, and the fallback evidence (170 tests, clippy, lint, overlay) is in this file. |
 
 ## Verified runs
 

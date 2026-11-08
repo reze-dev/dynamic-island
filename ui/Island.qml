@@ -30,6 +30,18 @@ Rectangle {
     /// The daemon connection, for the live numbers in the peek view.
     property var bridge: null
 
+    /// The morph duration the shell resolved from settings, so
+    /// `settings.set '{"key":"morph_duration_ms",…}'` tunes the feel
+    /// without a rebuild.
+    readonly property int morphMs: (bridge && bridge.settings
+        && bridge.settings.morph_duration_ms !== undefined
+        && bridge.settings.morph_duration_ms > 0)
+        ? bridge.settings.morph_duration_ms
+        : Theme.morphDuration
+
+    readonly property bool reducedMotion: bridge && bridge.settings
+        && bridge.settings.reduced_motion === true
+
     /// The tallest the panel may grow. The shell sets this from the height
     /// of the screen, so that a tall panel never runs off the top of it.
     property int maxHeight: Theme.panelMaxHeight
@@ -117,19 +129,19 @@ Rectangle {
 
     Behavior on width {
         NumberAnimation {
-            duration: Theme.reducedMotion ? 0 : Theme.morphDuration
+            duration: island.reducedMotion ? 0 : island.morphMs
             easing: Theme.emphasized
         }
     }
     Behavior on height {
         NumberAnimation {
-            duration: Theme.reducedMotion ? 0 : Theme.morphDuration
+            duration: island.reducedMotion ? 0 : island.morphMs
             easing: Theme.emphasized
         }
     }
     Behavior on radius {
         NumberAnimation {
-            duration: Theme.reducedMotion ? 0 : Theme.morphDuration
+            duration: island.reducedMotion ? 0 : island.morphMs
             easing: Theme.emphasized
         }
     }

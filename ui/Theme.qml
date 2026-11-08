@@ -235,8 +235,13 @@ QtObject {
     /// The curve for anything that leaves.
     readonly property int accelerate: Easing.InCubic
 
-    /// How long the island takes to change shape.
-    readonly property int morphDuration: 500
+    /// How long the island takes to change shape. Tune with
+    /// `settings.set '{"key":"morph_duration_ms","value":700}'` —
+    /// 500 is the Material-ish default, 700 is stately, 250 is snappy.
+    property int morphDuration: 500
+    /// Stagger between content changes, so the shape settles before the
+    /// next thing arrives.
+    readonly property int staggerDuration: 30
     /// When the user prefers reduced motion, all morphs collapse to
     /// instant changes.
     property bool reducedMotion: false
