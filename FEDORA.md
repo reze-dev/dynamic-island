@@ -103,7 +103,7 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 | Phase | What is missing |
 |-------|-----------------|
-| 7 | Stagger is wired (30 ms staggered content cross-fades, reduced-motion aware); a11y spans reduced-motion, high-contrast (Theme colors + shell wiring), visible focus ring, away-collapse, screen-reader names, and keyboard-operable buttons. Easing is tokenized end to end (15 sites on `Theme.emphasized/decelerate/accelerate`; no hardcoded `Easing.*` left). Panel fallbacks cover all ten panels with daemon/missing-service naming, action buttons queued offline (persisted to `~/.local/state/isle/queue.json`, capped 100, FIFO flush on reconnect, "N queued items sent" announce), cached-payload staleness banners (`StaleBanner` component in 8 daemon-backed panels, verified by mocked-bridge render), and tray icons resolved through five levels (named path → attention variant → themed fallback → BMP pixmap → title-initial → generic glyph). Tray pixmaps share the wallhaven-thumbnail LRU budget (200 MiB combined) and expire after 7 days. Queue flush ordering is verified (writes flush before reload reads on one stream; reloads observe post-write state — E2E 2026-11-09 with a second seeded todo). Pixmap freshness is verified (in-use icons touched on read, surviving TTL via `an_in_use_pixmap_survives_ttl_by_being_touched`). Phase 7 items are closed; remaining work is polish only. |
+| 7 | Stagger is wired (30 ms staggered content cross-fades, reduced-motion aware); a11y spans reduced-motion, high-contrast (Theme colors + shell wiring), visible focus ring, away-collapse, screen-reader names, and keyboard-operable buttons. Easing is tokenized end to end (15 sites on `Theme.emphasized/decelerate/accelerate`; no hardcoded `Easing.*` left). Panel fallbacks cover all ten panels with daemon/missing-service naming, action buttons queued offline (persisted to `~/.local/state/isle/queue.json`, capped 100, FIFO flush on reconnect, "N queued items sent" announce), cached-payload staleness banners (`StaleBanner` component in 8 daemon-backed panels, verified by mocked-bridge render), and tray icons resolved through five levels (named path → attention variant → themed fallback → BMP pixmap → title-initial → generic glyph). Tray pixmaps share the wallhaven-thumbnail LRU budget (200 MiB combined) and expire after 7 days. Queue flush ordering is verified (writes flush before reload reads on one stream; reloads observe post-write state — E2E 2026-11-09 with a second seeded todo). Pixmap freshness is verified (in-use icons touched on read, surviving TTL via `an_in_use_pixmap_survives_ttl_by_being_touched`). Tray icon refresh is fixed (`tray.changed` event wired in the bridge + `tray.list` live-owner filter so dead items never surface). Phase 7 items are closed; remaining work is polish only. |
 | - | System RPM is built and verified (4.3M, `Requires: quickshell >= 0.3.2, mesa-libGL, (awww or hyprpaper), systemd-user`; staged via DNF-downloaded `rpm-build` without root). Runtime quickshell is the Nix store 0.3.2: Fedora's 0.2.1-git was downloaded, extracted, and run — it fails to load the shell at `BackgroundEffect.blurRegion` ("Non-existent attached object") and `Region.radius` ("Cannot assign to non-existent property"), both absent in 0.2.1 qmltypes but present in 0.3.2. The overlay layer itself exists in both, so the blocker is blur glass + rounded masks, not overlay. See `packaging/fedora.yaml` for the qmltypes evidence. Same fallback evidence (170 tests, clippy, lint, overlay) below. |
 
 ## Verified runs
@@ -163,6 +163,19 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
   within a week even under budget. Test
   `expired_pixmaps_are_evicted_even_under_the_cap` (back-dates with
   `touch -d`, no new crates) — 176 tests total.
+- Live tray + notifications 2026-11-09: with Waybar paused and
+  `ISLED_CLAIM_TRAY=1`, `fake-tray --title PulseAudio --icon mpv`
+  registered and `tray.list` returned it with the hicolor `mpv.png`
+  path; the tray panel rendered 2 items (fake + real `copyq` with its
+  own icon). Two rich notifications with bodies rendered in the
+  notifications panel ("2 · 2 new", dismiss per item). Found a real
+  bug in the process: the bridge never handled `tray.changed`, so the
+  panel never refreshed after connect — fixed (direct assignment of
+  the event payload) and `tray.list` gained a live-owner filter
+  (`NameHasOwner`) so dead items never surface even if the refresh
+  loop misses them. SlideText animator added (`SlideText.qml`,
+  two-row mechanics mirroring SlideActivity, used by ActivityRow).
+  Session restored afterwards (Waybar restarted, claim env unset).
 - `just package-fedora` → `/tmp/isle-fedora.tar.gz` (4.3 MB, no sudo
   needed to install — `install.sh` writes user-local units).
 - System path staged: `DESTDIR=/tmp/opencode/isle-system-test bash

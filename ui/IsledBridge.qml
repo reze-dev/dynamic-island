@@ -272,6 +272,11 @@ QtObject {
         case "context.changed":
             bridge.context = data;
             break;
+        case "tray.changed":
+            // The payload is the full item list (with resolved icon paths
+            // and tooltips), so assign directly instead of refetching.
+            bridge.tray = data || [];
+            break;
         case "session.lagged":
             bridge.lastError = "missed " + data.missed + " events";
             break;

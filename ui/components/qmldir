@@ -11,6 +11,7 @@ ProgressRing 1.0 ProgressRing.qml
 Ripple 1.0 Ripple.qml
 SectionHeader 1.0 SectionHeader.qml
 SlideActivity 1.0 SlideActivity.qml
+SlideText 1.0 SlideText.qml
 Snackbar 1.0 Snackbar.qml
 StaleBanner 1.0 StaleBanner.qml
 StateLayer 1.0 StateLayer.qml

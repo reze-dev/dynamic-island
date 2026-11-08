@@ -1590,7 +1590,7 @@ impl Server {
                 }
             }
             "tray.list" => {
-                let items = self.tray.items().await;
+                let items = self.tray.live_items().await;
                 let payload: Vec<serde_json::Value> = items.iter().map(|i| i.payload()).collect();
                 ServerMessage::reply_with(id, serde_json::json!({ "items": payload }))
             }

@@ -47,26 +47,22 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 1
 
-        Text {
+        SlideText {
             width: parent.width
             text: root.title
             color: Theme.onSurface
-            font.family: Theme.fontFamily
-            font.pixelSize: root.compact ? Theme.type.bodyMedium.size : Theme.type.bodyLarge.size
-            font.weight: root.compact ? Theme.type.bodyMedium.weight : Theme.type.bodyLarge.weight
-            font.letterSpacing: root.compact ? Theme.type.bodyMedium.tracking : Theme.type.bodyLarge.tracking
-            elide: Text.ElideRight
+            pixelSize: root.compact ? Theme.type.bodyMedium.size : Theme.type.bodyLarge.size
+            weight: root.compact ? Theme.type.bodyMedium.weight : Theme.type.bodyLarge.weight
+            tracking: root.compact ? Theme.type.bodyMedium.tracking : Theme.type.bodyLarge.tracking
         }
 
-        Text {
+        SlideText {
             width: parent.width
             visible: !root.compact && root.subtitle !== ""
             text: root.subtitle
             color: Theme.onSurfaceVariant
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.type.bodySmall.size
-            font.letterSpacing: Theme.type.bodySmall.tracking
-            elide: Text.ElideRight
+            pixelSize: Theme.type.bodySmall.size
+            weight: Theme.type.bodySmall.weight
         }
     }
 }

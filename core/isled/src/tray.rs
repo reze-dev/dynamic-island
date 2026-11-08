@@ -178,6 +178,44 @@ impl Tray {
         items
     }
 
+    /// Whether a service still owns its bus name. The in-memory registry
+    /// can hold an item whose process died before the next refresh tick;
+    /// list answers must not surface such ghosts.
+    pub async fn is_alive(&self, service: &str) -> bool {
+        let Ok(connection) = zbus::Connection::session().await else {
+            return true; // no bus: assume alive rather than hide items
+        };
+        let proxy = zbus::Proxy::new(
+            &connection,
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
+            "org.freedesktop.DBus",
+        );
+        let Ok(proxy) = proxy.await else {
+            return true;
+        };
+        let Ok(reply) = proxy.call_method("NameHasOwner", &(service,)).await else {
+            return true;
+        };
+        let Ok(owner) = reply.body().deserialize::<zbus::zvariant::OwnedValue>() else {
+            return true;
+        };
+        bool::try_from(owner).unwrap_or(true)
+    }
+
+    /// The known items whose bus name is still owned. This is what
+    /// `tray.list` serves, so a dead item can never be listed however
+    /// long the refresh loop takes to notice.
+    pub async fn live_items(&self) -> Vec<TrayItem> {
+        let mut kept = Vec::new();
+        for item in self.items().await {
+            if self.is_alive(&item.service).await {
+                kept.push(item);
+            }
+        }
+        kept
+    }
+
     /// The bus names of the items, which is what the watcher's property
     /// reports.
     async fn services(&self) -> Vec<String> {
