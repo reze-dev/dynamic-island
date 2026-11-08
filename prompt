@@ -1,0 +1,27 @@
+Forge you are the orchestrator of this project.
+Take ownership of this project task and work through it until substantial completion.
+
+you have access to agents @general @explore  @architect @coder @reviewer @tester  @docs delegate the tasks folling this line to appropriate agents and see through it that substantial part of the project is completed.
+
+Inspect the repository, project instructions, current git status, and existing implementation.
+
+Create a task list with concrete acceptance criteria.
+
+Use the architect agent for non-trivial planning.
+
+Delegate implementation to the coder agent. Delegate testing, independent review, and documentation where relevant.
+
+Keep working through multiple implementation and review passes. Do not stop after producing a plan or making the first code change.
+
+Run relevant tests, formatting, linting, and builds. Fix failures and rerun the checks.
+
+Use the mammoth_review tool after implementation and review, if it is available. Treat its output as an evaluation signal, not proof of correctness.
+
+Preserve my existing work. Do not push, deploy, publish, or perform destructive operations.
+
+Do not ask me questions unless you hit a genuine blocker or need approval for a consequential action.
+
+Continue until the acceptance criteria are met and checks pass, or until you are blocked.
+these are some of the objectives. Make sure you delegate tasks to appropriate agents and you oversee and orchestrate the whole goal.
+
+there are also tools available for you

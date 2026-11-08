@@ -15,6 +15,42 @@ Item {
     property string dirDraft: ""
     property bool dirEditing: false
 
+    // The Wallhaven tab: a remote grid the daemon fetches for us, because
+    // Quickshell's QML cannot load remote images itself.
+    property string tab: "local"
+    property var whItems: []
+    property int whPage: 1
+    property int whLastPage: 1
+    property bool whLoading: false
+    property string whError: ""
+    property string whQuery: ""
+    property Timer whDebounce: Timer {
+        id: whTimer
+        interval: 400
+        repeat: false
+        onTriggered: panel.whSearch()
+    }
+
+    function whSearch() {
+        if (!panel.bridge || panel.tab !== "wallhaven")
+            return;
+        panel.whLoading = true;
+        panel.whError = "";
+        panel.bridge.call(
+            "wallpaper.search",
+            { "q": panel.whQuery, "page": panel.whPage },
+            function (ok, payload, error) {
+                panel.whLoading = false;
+                if (ok && payload) {
+                    panel.whItems = payload.items || [];
+                    panel.whPage = payload.page || 1;
+                    panel.whLastPage = payload.last_page || 1;
+                } else {
+                    panel.whError = error || "Wallhaven is unreachable.";
+                }
+            });
+    }
+
     readonly property var payload: bridge && bridge.wallpapers ? bridge.wallpapers : null
     readonly property var items: payload && payload.items ? payload.items : []
     readonly property var current: payload && payload.current ? payload.current : null
@@ -233,12 +269,78 @@ Item {
         dirField.text = dir;
     }
 
+    // The tabs: Local (the directory above) and Wallhaven (remote).
+    Row {
+        id: tabs
+        anchors.top: dirCard.bottom
+        anchors.topMargin: Theme.spacingTight
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: Theme.spacing
+        anchors.rightMargin: Theme.spacing
+        height: 30
+        spacing: Theme.spacingTight
+
+        Repeater {
+            model: ["local", "wallhaven"]
+            Item {
+                required property var modelData
+                required property int index
+                width: 90
+                height: 30
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.radiusSmall
+                    color: panel.tab === modelData ? Theme.primaryDim : Theme.surfaceFillLow
+                    border.width: 1
+                    border.color: panel.tab === modelData ? Theme.primary : Theme.outlineVariant
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: modelData === "local" ? "Local" : "Wallhaven"
+                        color: panel.tab === modelData ? Theme.primary : Theme.onSurfaceVariant
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.type.labelSmall.size
+                        font.weight: Theme.type.labelSmall.weight
+                        font.letterSpacing: Theme.type.labelSmall.tracking
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        panel.tab = modelData;
+                        if (modelData === "wallhaven" && panel.whItems.length === 0 && !panel.whLoading)
+                            panel.whSearch();
+                    }
+                }
+            }
+        }
+
+        TextField {
+            id: whSearchField
+            anchors.verticalCenter: parent.verticalCenter
+            width: tabs.width - 90 * 2 - Theme.spacingTight * 2
+            placeholder: "Search wallhaven…"
+            visible: panel.tab === "wallhaven"
+            onTextChanged: {
+                panel.whQuery = text;
+                whTimer.restart();
+            }
+            onEscapePressed: {
+                if (text !== "") text = "";
+            }
+        }
+    }
+
     // The grid. It has to scroll: a directory of wallpapers is usually bigger
     // than the panel, and a grid that only shows the first eight is a grid
     // with a wall of nothing at the bottom.
     Flickable {
         id: scroller
-        anchors.top: dirCard.bottom
+        anchors.top: tabs.bottom
         anchors.topMargin: Theme.spacing
         anchors.left: parent.left
         anchors.right: parent.right
@@ -247,7 +349,7 @@ Item {
         anchors.rightMargin: Theme.spacing
         anchors.bottomMargin: Theme.spacing
         contentWidth: width
-        contentHeight: grid.height
+        contentHeight: (panel.tab === "wallhaven" ? whGrid.height : grid.height) + (panel.tab === "wallhaven" ? 36 : 0)
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
@@ -276,6 +378,7 @@ Item {
             columns: 4
             columnSpacing: Theme.spacingTight
             rowSpacing: Theme.spacingTight
+            visible: panel.tab === "local"
 
         Repeater {
             model: panel.items
@@ -359,7 +462,158 @@ Item {
                 }
             }
         }
-    }
+        }
+
+        // The remote Wallhaven grid. Thumbnails are remote URLs, but the
+        // QML engine cannot load them directly, so the daemon downloads them
+        // alongside search: `thumb_path` in the search payload points at the
+        // local cache. The grid paints instantly from disk.
+        Grid {
+            id: whGrid
+            width: scroller.width
+            columns: 4
+            columnSpacing: Theme.spacingTight
+            rowSpacing: Theme.spacingTight
+            visible: panel.tab === "wallhaven"
+
+            Repeater {
+                model: panel.whItems
+
+                Item {
+                    required property var modelData
+
+                    width: (whGrid.width - Theme.spacingTight * 3) / 4
+                    height: width * 0.62
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.radiusSmall
+                        color: Theme.surfaceFillLow
+                        clip: true
+
+                        Image {
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            source: panel.visible && modelData.thumb_path ? "file://" + modelData.thumb_path : ""
+                            sourceSize: Qt.size(240, 150)
+                            asynchronous: true
+                            fillMode: Image.PreserveAspectCrop
+                            smooth: true
+                        }
+
+                        // The free palette, as a sliver at the bottom.
+                        Row {
+                            anchors.bottom: parent.bottom
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            height: 4
+                            spacing: 0
+                            visible: modelData.colors && modelData.colors.length > 0
+                            Repeater {
+                                model: modelData.colors
+                                Rectangle {
+                                    required property var modelData
+                                    width: whGrid.width / 4 / modelData.length
+                                    height: 4
+                                    color: modelData
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: parent.radius
+                            color: "transparent"
+                            border.width: 1
+                            border.color: Theme.outlineVariant
+                        }
+                    }
+
+                    Text {
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.margins: 5
+                        visible: whTile.containsMouse
+                        text: modelData.resolution + (modelData.source ? " · " + modelData.source : "")
+                        color: Theme.onSurface
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.type.labelSmall.size
+                        font.weight: Theme.type.labelSmall.weight
+                        font.letterSpacing: Theme.type.labelSmall.tracking
+                        elide: Text.ElideRight
+                    }
+
+                    MouseArea {
+                        id: whTile
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: panel.bridge
+                            ? panel.bridge.callAndSay(
+                                "wallpaper.download",
+                                { "url": modelData.path },
+                                "Downloaded into your catalog")
+                            : null
+                    }
+                }
+            }
+        }
+
+        Row {
+            anchors.top: (panel.tab === "wallhaven" ? whGrid : grid).bottom
+            anchors.topMargin: Theme.spacingTight
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: panel.tab === "wallhaven"
+            spacing: Theme.spacingTight
+
+            IconButton {
+                icon: "chev_left"
+                size: 28
+                enabled: panel.whPage > 1 && !panel.whLoading
+                tooltip: "Older results"
+                onClicked: {
+                    if (panel.whPage > 1) {
+                        panel.whPage -= 1;
+                        panel.whSearch();
+                    }
+                }
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: panel.whLoading ? "Searching…" : ("Page " + panel.whPage + " / " + panel.whLastPage)
+                color: Theme.onSurfaceVariant
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.type.labelSmall.size
+                font.weight: Theme.type.labelSmall.weight
+            }
+
+            IconButton {
+                icon: "chev_right"
+                size: 28
+                enabled: panel.whPage < panel.whLastPage && !panel.whLoading
+                tooltip: "Newer results"
+                onClicked: {
+                    if (panel.whPage < panel.whLastPage) {
+                        panel.whPage += 1;
+                        panel.whSearch();
+                    }
+                }
+            }
+        }
+
+        Text {
+            anchors.top: (panel.tab === "wallhaven" ? whGrid : grid).bottom
+            anchors.topMargin: Theme.spacingTight
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: panel.tab === "wallhaven" && panel.whError !== ""
+            text: panel.whError
+            color: Theme.toneWarn
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.type.labelSmall.size
+            font.weight: Theme.type.labelSmall.weight
+        }
     }
 
     Text {

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Wayland._WlrLayerShell
 import "components"
 
 // The root surface.
@@ -18,6 +19,17 @@ PanelWindow {
     color: "transparent"
 
     exclusionMode: ExclusionMode.Ignore
+
+    // The island lives in the topmost (overlay) layer all the time. A normal
+    // Top-layer surface can be covered by another overlay (notifications,
+    // drag views, fullscreen apps), and then clicks meant for the shell land
+    // on the expanded panel instead. Overlay + aboveWindows keeps the island
+    // above everything so its input mask is authoritative. The mask below
+    // still limits input to the island and snackbar, so topmost does not mean
+    // the whole top strip eats clicks. Verified on Sway: swaymsg reports
+    // this surface as layer "overlay".
+    WlrLayershell.layer: WlrLayer.Overlay
+    aboveWindows: true
 
     // The keyboard belongs to the island only while a panel is open.
     //

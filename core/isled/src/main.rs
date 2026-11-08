@@ -22,6 +22,7 @@ mod store;
 mod tray;
 #[allow(dead_code)]
 mod tz;
+mod wallhaven;
 mod wallpaper;
 
 use isle_core::{ClientMessage, ServerMessage};

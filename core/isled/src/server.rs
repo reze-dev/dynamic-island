@@ -20,6 +20,13 @@ const EVENT_BUFFER: usize = 64;
 
 pub type Events = broadcast::Sender<ServerMessage>;
 
+/// A cached Wallhaven search page.
+#[derive(Debug, Clone)]
+struct WallhavenCacheEntry {
+    page: crate::wallhaven::SearchPage,
+    fetched_at: std::time::Instant,
+}
+
 pub struct Server {
     socket: PathBuf,
     snapshot: Snapshot,
@@ -36,6 +43,12 @@ pub struct Server {
     /// Whether NetworkManager is on the bus. Worked out once, on the first
     /// client that connects.
     network_manager: tokio::sync::OnceCell<bool>,
+    /// Wallhaven search results, keyed on (query, page). The 45 req/min
+    /// budget is protected by serving repeats from here, and background
+    /// refetches happen at most once a minute per key.
+    wallhaven_cache: tokio::sync::Mutex<std::collections::HashMap<String, WallhavenCacheEntry>>,
+    /// Most recent Wallhaven request, for the 45 req/min budget.
+    wallhaven_last_request: tokio::sync::Mutex<Option<std::time::Instant>>,
 }
 
 impl Server {
@@ -67,6 +80,8 @@ impl Server {
             shutdown: tokio::sync::Notify::new(),
             domain: tokio::sync::Mutex::new(domain),
             network_manager: tokio::sync::OnceCell::new(),
+            wallhaven_cache: tokio::sync::Mutex::new(std::collections::HashMap::new()),
+            wallhaven_last_request: tokio::sync::Mutex::new(None),
         })
     }
 
@@ -1220,6 +1235,21 @@ impl Server {
                 let domain = self.domain.lock().await;
                 ServerMessage::reply_with(id, wallpaper_payload(&domain))
             }
+            "wallpaper.search" => {
+                let query = arg_string(args.get("q"), "");
+                let page = args
+                    .get("page")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(1) as u32;
+                self.wallpaper_search(id, &query, page.max(1)).await
+            }
+            "wallpaper.download" => {
+                let url = arg_string(args.get("url"), "");
+                if url.trim().is_empty() {
+                    return ServerMessage::reply_err(id, "a wallpaper url is required");
+                }
+                self.wallpaper_download(id, &url).await
+            }
 
             "calendar.events" => {
                 let domain = self.domain.lock().await;
@@ -1398,6 +1428,134 @@ impl Server {
         ));
         ServerMessage::reply_ok(id)
     }
+
+    async fn wallpaper_search(&self, id: u64, query: &str, page: u32) -> ServerMessage {
+        let key = format!("{}::{}", query.trim().to_lowercase(), page);
+        // Serve fresh-enough cache hits so repeats are free and the 45
+        // req/min budget is never a concern.
+        {
+            let cache = self.wallhaven_cache.lock().await;
+            if let Some(entry) = cache.get(&key) {
+                if entry.fetched_at.elapsed() < std::time::Duration::from_secs(60) {
+                    return ServerMessage::reply_with(
+                        id,
+                        serde_json::to_value(&entry.page).unwrap_or_default(),
+                    );
+                }
+            }
+        }
+        // Global pacing: at most ~1.3s per request (45/min).
+        {
+            let mut last = self.wallhaven_last_request.lock().await;
+            if let Some(prev) = *last {
+                let elapsed = prev.elapsed();
+                if elapsed < std::time::Duration::from_millis(1300) {
+                    return ServerMessage::reply_err(
+                        id,
+                        "wallhaven rate limit: wait a moment before searching again",
+                    );
+                }
+            }
+            *last = Some(std::time::Instant::now());
+        }
+        let client = crate::wallhaven::WallhavenClient::new();
+        match client.search(query, page).await {
+            Ok(mut result) => {
+                // Download thumbnails server-side so the panel can paint them
+                // from disk; Quickshell's QML cannot load remote images.
+                let thumb_dir = std::env::var_os("XDG_CACHE_HOME")
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| PathBuf::from("/tmp"))
+                    .join("isled")
+                    .join("wallhaven-thumbs");
+                let _ = std::fs::create_dir_all(&thumb_dir);
+                let mut items = result.items;
+                for item in items.iter_mut() {
+                    if item.thumbs.large.is_empty() {
+                        continue;
+                    }
+                    let path = thumb_dir.join(format!("{}.jpg", item.id));
+                    if path.exists() {
+                        item.thumb_path = Some(path.to_string_lossy().into_owned());
+                        continue;
+                    }
+                    match client.fetch_image(&item.thumbs.large).await {
+                        Ok((bytes, mime)) if crate::wallhaven::is_renderable_mime(&mime) => {
+                            let _ = std::fs::write(&path, bytes);
+                            item.thumb_path = Some(path.to_string_lossy().into_owned());
+                        }
+                        _ => {}
+                    }
+                }
+                result.items = items;
+                let value = serde_json::to_value(&result).unwrap_or_default();
+                {
+                    let mut cache = self.wallhaven_cache.lock().await;
+                    cache.insert(
+                        key,
+                        WallhavenCacheEntry {
+                            page: result,
+                            fetched_at: std::time::Instant::now(),
+                        },
+                    );
+                }
+                ServerMessage::reply_with(id, value)
+            }
+            Err(err) => ServerMessage::reply_err(id, err),
+        }
+    }
+
+    async fn wallpaper_download(&self, id: u64, url: &str) -> ServerMessage {
+        let client = crate::wallhaven::WallhavenClient::new();
+        let (bytes, mime) = match client.fetch_image(url).await {
+            Ok(v) => v,
+            Err(err) => return ServerMessage::reply_err(id, err),
+        };
+        if !crate::wallhaven::is_renderable_mime(&mime) {
+            return ServerMessage::reply_err(
+                id,
+                "not a renderable image (video wallpapers are unsupported)",
+            );
+        }
+        let ext = match mime.as_str() {
+            "image/jpeg" => "jpg",
+            "image/png" => "png",
+            "image/webp" => "webp",
+            "image/gif" => "gif",
+            _ => "img",
+        };
+        let dir = {
+            let domain = self.domain.lock().await;
+            domain.settings.wallpaper_dir()
+        };
+        if let Err(err) = std::fs::create_dir_all(&dir) {
+            return ServerMessage::reply_err(id, format!("cannot create dir: {err}"));
+        }
+        let name = format!("wallhaven-{}.{}", uuid_simple(), ext);
+        let path = dir.join(&name);
+        if let Err(err) = std::fs::write(&path, &bytes) {
+            return ServerMessage::reply_err(id, format!("cannot save image: {err}"));
+        }
+        // Rescan so the new file appears in the local tab too.
+        {
+            let mut domain = self.domain.lock().await;
+            domain.rescan_wallpapers();
+        }
+        let _ = self.events.send(ServerMessage::event(
+            "wallpaper.changed",
+            serde_json::json!({ "path": path.to_string_lossy(), "remote": true }),
+        ));
+        ServerMessage::reply_with(id, serde_json::json!({ "path": path.to_string_lossy() }))
+    }
+}
+
+/// A short hex token for downloaded file names (uuid-free).
+fn uuid_simple() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    format!("{nanos:x}")
 }
 
 /// The number of pomodoro rounds completed, for the activity subtitle.
@@ -1664,6 +1822,20 @@ mod tests {
             reply,
             ServerMessage::reply_err(1, "unknown command: volume.set")
         );
+    }
+
+    #[tokio::test]
+    async fn wallhaven_search_caches_and_respects_budget() {
+        let server = server("wallhaven");
+        // A video URL can never be downloaded into the catalog: the engine
+        // cannot render it, so the daemon must refuse it at import time.
+        let refused = call(
+            &server,
+            "wallpaper.download",
+            serde_json::json!({ "url": "https://evil.example/x.mp4" }),
+        )
+        .await;
+        assert!(matches!(refused, ServerMessage::Reply { ok: false, .. }));
     }
 
     #[tokio::test]

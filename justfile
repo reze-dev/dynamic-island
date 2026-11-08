@@ -126,12 +126,58 @@ check-all: check lint-qml binary-is-fresh
 # crash; systemd also unlinks the socket reliably on SIGTERM, which is what
 # keeps the next start from failing with "address already in use".
 install-units:
+    #!/usr/bin/env bash
+    set -euo pipefail
     mkdir -p {{units}}
-    cp {{repo}}/systemd/{{daemon}}.service {{units}}/
-    cp {{repo}}/systemd/{{shell}}.service {{units}}/
+    # Resolve binaries that survive outside the devshell. On NixOS these
+    # already sit at /run/current-system/sw/bin; on Fedora-with-Nix they are
+    # Nix-store paths, so bake them into the unit at install time.
+    if command -v quickshell >/dev/null 2>&1; then
+        QS=$(command -v quickshell)
+    elif [ -x /run/current-system/sw/bin/quickshell ]; then
+        QS=/run/current-system/sw/bin/quickshell
+    else
+        QS=$(nix build --no-link --print-out-paths nixpkgs#quickshell 2>/dev/null)/bin/quickshell
+    fi
+    if command -v isled >/dev/null 2>&1; then
+        ISLED=$(command -v isled)
+    else
+        ISLED="{{bin}}"
+    fi
+    # EGL on Fedora+Nix: the store quickshell has no Mesa vendor stack, so
+    # point glvnd at the store Mesa build (verified: sway maps the overlay
+    # surface, no "EGL not available"). NixOS ignores the extra env.
+    MESA=$(nix build --no-link --print-out-paths nixpkgs#mesa 2>/dev/null || true)
+    GLV=$(nix build --no-link --print-out-paths nixpkgs#libglvnd 2>/dev/null || true)
+    render() {
+        sed -e "s|@ISLED_BIN@|${ISLED}|g" \
+            -e "s|@QUICKSHELL_BIN@|${QS}|g" \
+            -e "s|@UI_PATH@|{{ui}}|g" \
+            "$1" > "$2"
+    }
+    # Template units carry @PLACEHOLDER@ tokens; the checked-in .service
+    # files are the NixOS originals and are only used as fallback text.
+    SRC_ISLED="{{repo}}/systemd/{{daemon}}.service.template"
+    SRC_QS="{{repo}}/systemd/{{shell}}.service.template"
+    [ -f "$SRC_ISLED" ] || SRC_ISLED="{{repo}}/systemd/{{daemon}}.service"
+    [ -f "$SRC_QS" ] || SRC_QS="{{repo}}/systemd/{{shell}}.service"
+    render "$SRC_ISLED" "{{units}}/{{daemon}}.service"
+    render "$SRC_QS" "{{units}}/{{shell}}.service"
+    # Insert the Fedora EGL lines into the [Service] block (before [Install]).
+    if [ -n "${MESA:-}" ] && [ -n "${GLV:-}" ] && ! grep -q "^Environment=LD_LIBRARY_PATH" "{{units}}/{{shell}}.service"; then
+        awk -v mesa="${MESA}" -v glv="${GLV}" '
+            /^\[Install\]/ {
+                print "Environment=LD_LIBRARY_PATH=" mesa "/lib:" glv "/lib"
+                print "Environment=__GLVND_LIBRARY_PATH=" mesa "/lib/libEGL_mesa.so"
+                print "Environment=__GLX_VENDOR_LIBRARY_NAME=mesa"
+            }
+            { print }
+        ' "{{units}}/{{shell}}.service" > "{{units}}/{{shell}}.service.tmp"
+        mv -f "{{units}}/{{shell}}.service.tmp" "{{units}}/{{shell}}.service"
+    fi
     systemctl --user daemon-reload
-    @echo "installed {{units}}/{{daemon}}.service"
-    @echo "installed {{units}}/{{shell}}.service"
+    echo "installed {{units}}/{{daemon}}.service"
+    echo "installed {{units}}/{{shell}}.service"
 
 # `--now` also enables them at graphical-session.target, so they come back
 # after a reboot. Without it they only run until next login.

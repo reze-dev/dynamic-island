@@ -1,0 +1,27 @@
+[Unit]
+Description=Dynamic Island Shell UI
+Requires=isled.service
+After=isled.service
+
+[Service]
+Type=simple
+ExecStart=@QUICKSHELL_BIN@ -p @UI_PATH@
+Restart=on-failure
+RestartSec=2
+
+Environment=QT_QPA_PLATFORM=wayland
+Environment=EGL_PLATFORM=wayland
+
+# Fedora-with-Nix quirk: the Nix-packaged quickshell ships its own libEGL
+# but no Mesa vendor stack, so bare launches fail with
+# "EGL not available" / "Failed to initialize graphics backend for OpenGL".
+# `just install-units` appends LD_LIBRARY_PATH + __GLVND_LIBRARY_PATH lines
+# pointing glvnd at the Nix Mesa build for those machines.
+
+# The compositor adapter and the notification bus both read these. They are
+# already in the systemd user manager, so ImportEnvironment is enough; if the
+# compositor reports Unknown this is the first thing to check.
+ImportEnvironment=WAYLAND_DISPLAY XDG_RUNTIME_DIR XDG_SESSION_TYPE NIRI_SOCKET HYPRLAND_INSTANCE_SIGNATURE DBUS_SESSION_BUS_ADDRESS
+
+[Install]
+WantedBy=graphical-session.target
