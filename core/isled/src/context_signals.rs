@@ -21,7 +21,12 @@ use zbus::zvariant::OwnedValue;
 
 /// Fold one D-Bus source update into the engine. Returns the signal and
 /// whether it changed the context.
-pub fn fold_logind(ctx: &mut Context, idle: Option<bool>, session_present: Option<bool>, now: u64) -> bool {
+pub fn fold_logind(
+    ctx: &mut Context,
+    idle: Option<bool>,
+    session_present: Option<bool>,
+    now: u64,
+) -> bool {
     let mut changed = false;
     if let Some(idle) = idle {
         changed |= ctx.fold(&Signal::Idle { idle }, now);
@@ -32,7 +37,12 @@ pub fn fold_logind(ctx: &mut Context, idle: Option<bool>, session_present: Optio
     changed
 }
 
-pub fn fold_battery(ctx: &mut Context, percent: Option<u8>, charging: Option<bool>, now: u64) -> bool {
+pub fn fold_battery(
+    ctx: &mut Context,
+    percent: Option<u8>,
+    charging: Option<bool>,
+    now: u64,
+) -> bool {
     let percent = percent.unwrap_or(100);
     let charging = charging.unwrap_or(false);
     ctx.fold(&Signal::Battery { percent, charging }, now)
@@ -178,7 +188,10 @@ pub async fn read_nm_degraded() -> Option<bool> {
     .await
     .ok()?;
     let networking: OwnedValue = proxy
-        .call("Get", &("org.freedesktop.NetworkManager", "NetworkingEnabled"))
+        .call(
+            "Get",
+            &("org.freedesktop.NetworkManager", "NetworkingEnabled"),
+        )
         .await
         .ok()?;
     let enabled = bool::try_from(networking).unwrap_or(false);

@@ -63,26 +63,44 @@ impl Signal {
             },
             "battery" => Self::Battery {
                 percent: map.get("percent").and_then(|v| v.as_u64()).unwrap_or(100) as u8,
-                charging: map.get("charging").and_then(|v| v.as_bool()).unwrap_or(false),
+                charging: map
+                    .get("charging")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
             },
             "fullscreen" => Self::Fullscreen {
                 active: map.get("active").and_then(|v| v.as_bool()).unwrap_or(false),
             },
             "meeting" => Self::Meeting {
-                title: map.get("title").and_then(|v| v.as_str()).unwrap_or("").into(),
+                title: map
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .into(),
             },
             "calendar-soon" => Self::CalendarSoon {
-                title: map.get("title").and_then(|v| v.as_str()).unwrap_or("").into(),
+                title: map
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .into(),
                 seconds: map.get("seconds").and_then(|v| v.as_i64()).unwrap_or(0),
             },
             "network" => Self::Network {
-                degraded: map.get("degraded").and_then(|v| v.as_bool()).unwrap_or(false),
+                degraded: map
+                    .get("degraded")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
             },
             "clipboard-burst" => Self::ClipboardBurst {
                 count: map.get("count").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
             },
             "todo-due" => Self::TodoDue {
-                text: map.get("text").and_then(|v| v.as_str()).unwrap_or("").into(),
+                text: map
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .into(),
             },
             _ => return None,
         })
@@ -236,10 +254,7 @@ pub fn score(ctx: &Context, activity: &Activity) -> i32 {
 
 /// The activity the island should suggest now, if any.
 pub fn suggest(ctx: &Context, candidates: &[Activity]) -> Option<Activity> {
-    candidates
-        .iter()
-        .max_by_key(|a| score(ctx, a))
-        .cloned()
+    candidates.iter().max_by_key(|a| score(ctx, a)).cloned()
 }
 
 /// Whether a candidate should be quiet in this context (fullscreen hides
@@ -297,10 +312,13 @@ mod tests {
     #[test]
     fn low_battery_flips_the_state() {
         let mut ctx = Context::default();
-        ctx.fold(&Signal::Battery {
-            percent: 15,
-            charging: false,
-        }, 1);
+        ctx.fold(
+            &Signal::Battery {
+                percent: 15,
+                charging: false,
+            },
+            1,
+        );
         assert_eq!(ctx.state, ContextState::LowBattery);
     }
 
@@ -325,8 +343,8 @@ mod tests {
         };
         let media = act(ActivityKind::Media);
         assert!(is_quiet(&ctx, &media));
-        let critical = Activity::new(ActivityKind::LowBattery, "x", 0)
-            .with_tone(ActivityTone::Critical);
+        let critical =
+            Activity::new(ActivityKind::LowBattery, "x", 0).with_tone(ActivityTone::Critical);
         assert!(!is_quiet(&ctx, &critical));
     }
 
@@ -363,10 +381,10 @@ mod tests {
     #[test]
     fn signal_from_map_parses_wire_forms() {
         let wire = serde_json::json!({"kind": "idle", "idle": true});
+        assert_eq!(Signal::from_map(&wire), Some(Signal::Idle { idle: true }));
         assert_eq!(
-            Signal::from_map(&wire),
-            Some(Signal::Idle { idle: true })
+            Signal::from_map(&serde_json::json!({"kind": "bogus"})),
+            None
         );
-        assert_eq!(Signal::from_map(&serde_json::json!({"kind": "bogus"})), None);
     }
 }

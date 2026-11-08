@@ -657,12 +657,8 @@ impl Server {
                 .or_else(crate::context_signals::read_logind_idle_fallback);
             {
                 let mut domain = self.domain.lock().await;
-                let changed = crate::context_signals::fold_logind(
-                    &mut domain.context,
-                    idle,
-                    None,
-                    now,
-                );
+                let changed =
+                    crate::context_signals::fold_logind(&mut domain.context, idle, None, now);
                 if changed && domain.context.state == isle_core::ContextState::Away {
                     let _ = self.events.send(ServerMessage::event(
                         "context.changed",
@@ -838,11 +834,8 @@ impl Server {
                 if let Some(due) = next_due {
                     if due > 0 && (0..=300).contains(&(due as i64 - now as i64)) {
                         let mut domain = self.domain.lock().await;
-                        let changed = crate::context_signals::fold_todo(
-                            &mut domain.context,
-                            &next_text,
-                            now,
-                        );
+                        let changed =
+                            crate::context_signals::fold_todo(&mut domain.context, &next_text, now);
                         if changed {
                             self.trigger_activity(
                                 ActivityKind::Todo,
