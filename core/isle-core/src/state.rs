@@ -9,6 +9,7 @@ pub const PROTOCOL_VERSION: u32 = 1;
 pub enum Compositor {
     Niri,
     Hyprland,
+    Sway,
     #[default]
     Unknown,
 }
@@ -19,6 +20,10 @@ impl Compositor {
             Self::Niri
         } else if std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some_and(|v| !v.is_empty()) {
             Self::Hyprland
+        } else if std::env::var_os("SWAYSOCK").is_some_and(|v| !v.is_empty())
+            || std::env::var_os("I3SOCK").is_some_and(|v| !v.is_empty())
+        {
+            Self::Sway
         } else {
             Self::Unknown
         }
@@ -52,7 +57,7 @@ pub struct SystemStats {
     pub load_average: Option<f32>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Snapshot {
     pub version: u32,
     pub session: Session,
@@ -70,6 +75,10 @@ pub struct Snapshot {
     /// falls back to the first entry when nothing is ambient.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub activities: Vec<crate::live::Activity>,
+    /// What the compositor knows about the screen, if anything has been
+    /// reported yet. `None` until the first compositor event arrives.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compositor: Option<crate::compositor::CompositorInfo>,
 }
 
 impl Snapshot {
@@ -81,6 +90,7 @@ impl Snapshot {
             notifications: Vec::new(),
             activity: None,
             activities: Vec::new(),
+            compositor: None,
         }
     }
 }
@@ -155,6 +165,8 @@ mod tests {
         // no-session branch rather than a specific compositor.
         if std::env::var_os("NIRI_SOCKET").is_none()
             && std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_none()
+            && std::env::var_os("SWAYSOCK").is_none()
+            && std::env::var_os("I3SOCK").is_none()
         {
             assert_eq!(Compositor::detect(), Compositor::Unknown);
         }

@@ -7,7 +7,7 @@
 
 ## What works here (verified 2026-11-09)
 
-- `cargo test` (149 tests), `cargo clippy`, `cargo fmt`, `just lint-qml`,
+- `cargo test` (161 tests), `cargo clippy`, `cargo fmt`, `just lint-qml`,
   `just preview` / `just preview-live` all pass on Fedora.
 - `just install-units` writes `~/.config/systemd/user/isled.service` and
   `quickshell.service` with store paths baked in, and `just start` runs
@@ -22,6 +22,19 @@
   `wallpaper.download` return live results, thumbnails are cached under
   `~/.cache/isled/wallhaven-thumbs/`, and downloads land in the wallpaper
   directory.
+- **Phase 6 compositor adapter** works: `isle-core/src/compositor.rs`
+  normalizes outputs/workspaces/focused window; `isled/src/compositor.rs`
+  implements Niri (`$NIRI_SOCKET` `EventStream` JSON), Hyprland
+  (`hyprctl -j` + `event/socket2` `action>>data` lines) and Sway
+  (`swaymsg` + `get_tree`). `Compositor::Sway` now detects `$SWAYSOCK`.
+  The server supervises streams with 2 s reconnect backoff, applies focus
+  events as island activities, and exposes `compositor.info` /
+  `context.summary` `compositor`.
+- **Browser handoff** works: `isled/src/handoff.rs` polls `~/Downloads`
+  in the 1 s pulse, waits out partial writes, rejects video, imports
+  images into the catalog, and emits `wallpaper.changed` +
+  a "Wallpaper imported" activity. `wallpaper.handoff-open` opens a page
+  and `wallpaper.handoff-status` reports pending count.
 - `awww` 0.12.1 is available via the Nix devshell (`nix develop`).
 
 ## Fedora-with-Nix quirks
@@ -80,8 +93,8 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 | Phase | What is missing |
 |-------|-----------------|
-| 4 | Browser handoff (MoeWalls etc.) + `~/Downloads` watcher + pending-link UI; LRU pruning of the downloaded cache |
-| 6 | Compositor adapter trait: `subscribe()` event streams for niri/hyprland, `workspaces()`/`outputs()`/`focused_window()`, logind Idle/LockHint, UPower low-battery, PipeWire screencast meeting detection, network-quality and clipboard-burst signals, reducer + scorer |
+| 4 | Pending-link UI in the theme panel (daemon side done); LRU pruning of the downloaded cache |
+| 6 | logind Idle/LockHint, UPower low-battery, PipeWire screencast meeting detection, network-quality and clipboard-burst signals, reducer + scorer |
 | 7 | Idle/low-power behavior, animation tuning, a11y, fallbacks for missing services (no NM, no BT daemon, no MPRIS player, no wallpaper engine — some of these already degrade honestly in the UI) |
 | - | `quickshell` on Fedora still comes from the Nix store via `install-units`; there is no standalone `.deb/.rpm` path (the HM module is NixOS-only by design) |
 
@@ -91,4 +104,10 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
   `('overlay', 'quickshell', None)`.
 - `core/target/debug/isled call wallpaper.search` → 24 items, page 1/47,
   a 22 KB thumbnail on disk.
+- `core/target/debug/isled call compositor.info` → real Sway data:
+  `focused_window={app_id:kitty, title:'OC | Greeting', workspace:'OC | Greeting'}`,
+  `outputs=[{name:eDP-1, scale:1.0, width:1920, height:1080, refresh_hz:144000}]`,
+  `workspaces=[{name:1, focused:true, output:eDP-1}, {name:2, focused:false}]`.
+  `context.summary` now includes the same `compositor` block.
+- `core/target/debug/isled call wallpaper.handoff-status` → `{"dir":"/home/asuna/Downloads","pending":0}`.
 - `grim` screenshot shows the idle pill (dot + clock) at the top centre.

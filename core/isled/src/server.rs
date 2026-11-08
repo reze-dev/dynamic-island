@@ -49,6 +49,9 @@ pub struct Server {
     wallhaven_cache: tokio::sync::Mutex<std::collections::HashMap<String, WallhavenCacheEntry>>,
     /// Most recent Wallhaven request, for the 45 req/min budget.
     wallhaven_last_request: tokio::sync::Mutex<Option<std::time::Instant>>,
+    /// The compositor adapter and the latest info it reported.
+    compositor: tokio::sync::Mutex<crate::compositor::Adapter>,
+    compositor_info: tokio::sync::Mutex<Option<isle_core::CompositorInfo>>,
 }
 
 impl Server {
@@ -82,6 +85,10 @@ impl Server {
             network_manager: tokio::sync::OnceCell::new(),
             wallhaven_cache: tokio::sync::Mutex::new(std::collections::HashMap::new()),
             wallhaven_last_request: tokio::sync::Mutex::new(None),
+            compositor: tokio::sync::Mutex::new(crate::compositor::Adapter::from_detected(
+                isle_core::Compositor::detect(),
+            )),
+            compositor_info: tokio::sync::Mutex::new(None),
         })
     }
 
@@ -94,6 +101,7 @@ impl Server {
             .await;
         snapshot.features.network_manager = network_manager;
         snapshot.notifications = self.notifications.list().await;
+        snapshot.compositor = self.compositor_info.lock().await.clone();
         let domain = self.domain.lock().await;
         snapshot =
             snapshot.with_activities(domain.activities.ambient(), domain.activities.recent());
@@ -159,6 +167,9 @@ impl Server {
         let watcher = Arc::clone(&self);
         tokio::spawn(async move { watcher.watch_notifications().await });
 
+        let supervisor = Arc::clone(&self);
+        tokio::spawn(async move { supervisor.supervise_compositor().await });
+
         // The clipboard history fills itself up, if there is a way to watch
         // the clipboard.
         if let Some(mut selections) = crate::clipwatch::spawn(crate::clipwatch::watch_dir()) {
@@ -198,6 +209,170 @@ impl Server {
         }
     }
 
+    /// Keep compositor info fresh: query once at startup, then subscribe to
+    /// event streams (niri/hyprland/sway). Each stream is supervised with
+    /// reconnect-after-backoff so a compositor restart does not wedge us.
+    async fn supervise_compositor(&self) {
+        // Best-effort query; empty for Unknown.
+        let info = self.compositor.lock().await.query();
+        let is_empty =
+            info.outputs.is_empty() && info.workspaces.is_empty() && info.focused_window.is_none();
+        if !is_empty {
+            *self.compositor_info.lock().await = Some(info.clone());
+            let _ = self.events.send(ServerMessage::event(
+                "compositor.changed",
+                serde_json::to_value(&info).unwrap_or_default(),
+            ));
+        }
+
+        let detected = isle_core::Compositor::detect();
+        match detected {
+            isle_core::Compositor::Niri => self.subscribe_niri().await,
+            isle_core::Compositor::Hyprland => self.subscribe_hyprland().await,
+            isle_core::Compositor::Sway => self.poll_sway().await,
+            isle_core::Compositor::Unknown => {
+                // No stream to supervise. Nothing to do.
+            }
+        }
+    }
+
+    async fn apply_compositor_event(&self, event: isle_core::CompositorEvent) {
+        let mut info_guard = self.compositor_info.lock().await;
+        let mut info = info_guard.clone().unwrap_or_default();
+        match event {
+            isle_core::CompositorEvent::FocusChanged { window } => {
+                info.focused_window = window.clone();
+                if let Some(window) = window {
+                    if !window.title.is_empty() || !window.app_id.is_empty() {
+                        // Surfaced as an activity so the island reacts.
+                        let _ = self
+                            .trigger_activity(
+                                ActivityKind::Focus,
+                                if window.title.is_empty() {
+                                    window.app_id.clone()
+                                } else {
+                                    window.title.clone()
+                                },
+                                window.app_id.clone(),
+                                ActivityTone::Neutral,
+                                "focus",
+                                6_000,
+                                false,
+                                Some("compositor".to_string()),
+                            )
+                            .await;
+                    }
+                }
+            }
+            isle_core::CompositorEvent::WorkspaceChanged { workspaces } => {
+                info.workspaces = workspaces;
+            }
+            isle_core::CompositorEvent::OutputsChanged { outputs } => {
+                info.outputs = outputs;
+            }
+            isle_core::CompositorEvent::WindowSongChanged { window } => {
+                info.focused_window = window;
+            }
+            isle_core::CompositorEvent::Other { .. } => {}
+        }
+        *info_guard = Some(info.clone());
+        let _ = self.events.send(ServerMessage::event(
+            "compositor.changed",
+            serde_json::to_value(&info).unwrap_or_default(),
+        ));
+    }
+
+    async fn subscribe_niri(&self) {
+        let socket = std::env::var_os("NIRI_SOCKET")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_default();
+        if socket.as_os_str().is_empty() {
+            return;
+        }
+        loop {
+            match self.niri_stream(socket.clone()).await {
+                Ok(()) => {}
+                Err(err) => tracing::debug!(%err, "niri EventStream dropped"),
+            }
+            // Backoff before reconnecting.
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        }
+    }
+
+    async fn niri_stream(&self, socket: std::path::PathBuf) -> std::io::Result<()> {
+        let stream = tokio::net::UnixStream::connect(&socket).await?;
+        let (read, mut write) = stream.into_split();
+        write.write_all(b"{\"EventStream\":[]}\n").await?;
+        write.flush().await?;
+        let mut lines = tokio::io::BufReader::new(read).lines();
+        while let Some(line) = lines.next_line().await? {
+            let adapter = self.compositor.lock().await;
+            let event = adapter.parse_line(&line);
+            if let Some(event) = event {
+                self.apply_compositor_event(event).await;
+            }
+        }
+        Ok(())
+    }
+
+    async fn subscribe_hyprland(&self) {
+        let adapter_instance = std::env::var("HYPRLAND_INSTANCE_SIGNATURE").unwrap_or_default();
+        if adapter_instance.is_empty() {
+            return;
+        }
+        let runtime = std::env::var_os("XDG_RUNTIME_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+        let socket = runtime
+            .join("hypr")
+            .join(&adapter_instance)
+            .join("event")
+            .join("socket2");
+        loop {
+            match self.hypr_socket_stream(socket.clone()).await {
+                Ok(()) => {}
+                Err(err) => tracing::debug!(%err, "hyprland event socket dropped"),
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        }
+    }
+
+    async fn hypr_socket_stream(&self, socket: std::path::PathBuf) -> std::io::Result<()> {
+        let stream = tokio::net::UnixStream::connect(&socket).await?;
+        let (read, _write) = stream.into_split();
+        let mut lines = tokio::io::BufReader::new(read).lines();
+        while let Some(line) = lines.next_line().await? {
+            let adapter = self.compositor.lock().await;
+            if let Some(event) = adapter.parse_line(&line) {
+                self.apply_compositor_event(event).await;
+            }
+        }
+        Ok(())
+    }
+
+    /// Sway: poll queries every 5s (the IPC subscribe wire protocol is
+    /// binary-framed and not worth a second implementation here).
+    async fn poll_sway(&self) {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(5));
+        loop {
+            ticker.tick().await;
+            let info = self.compositor.lock().await.query();
+            let is_empty = info.outputs.is_empty()
+                && info.workspaces.is_empty()
+                && info.focused_window.is_none();
+            if !is_empty {
+                let changed = self.compositor_info.lock().await.clone() != Some(info.clone());
+                *self.compositor_info.lock().await = Some(info.clone());
+                if changed {
+                    let _ = self.events.send(ServerMessage::event(
+                        "compositor.changed",
+                        serde_json::to_value(&info).unwrap_or_default(),
+                    ));
+                }
+            }
+        }
+    }
+
     async fn tick_forever(&self) {
         let mut ticker = tokio::time::interval(TICK_INTERVAL);
         loop {
@@ -216,14 +391,19 @@ impl Server {
     async fn pulse_forever(&self) {
         let mut ticker = tokio::time::interval(PULSE_INTERVAL);
         let mut last_due_todo: Option<u64> = None;
+        let mut handoff_seen = crate::handoff::snapshot(&crate::handoff::downloads_dir());
         loop {
             ticker.tick().await;
-            self.pulse(&mut last_due_todo).await;
+            self.pulse(&mut last_due_todo, &mut handoff_seen).await;
         }
     }
 
     /// One pass of the fast loop.
-    async fn pulse(&self, last_due_todo: &mut Option<u64>) {
+    async fn pulse(
+        &self,
+        last_due_todo: &mut Option<u64>,
+        handoff_seen: &mut std::collections::HashSet<std::path::PathBuf>,
+    ) {
         let now_unix = unix_now();
         let now_ms = unix_now_ms();
 
@@ -329,10 +509,66 @@ impl Server {
             ));
         }
 
+        // Browser handoff: a human saved a wallpaper from a site with no
+        // API. Notice new images in Downloads and import them.
+        self.poll_handoff(handoff_seen).await;
+
         // Only say something when something changed. A chatty daemon is a
         // daemon that keeps the UI awake for no reason.
         if activities_changed {
             self.broadcast_activity_state().await;
+        }
+    }
+
+    /// Browser handoff: look for new images in Downloads. The 1s pulse is
+    /// fast enough to notice a human save quickly, and `is_settled` waits
+    /// out the browser's partial write.
+    async fn poll_handoff(&self, seen: &mut std::collections::HashSet<std::path::PathBuf>) {
+        let downloads = crate::handoff::downloads_dir();
+        let newcomers = crate::handoff::newcomers(&downloads, seen);
+        for candidate in newcomers {
+            if !crate::handoff::is_settled(&candidate) {
+                continue;
+            }
+            let catalog_dir = {
+                let domain = self.domain.lock().await;
+                domain.settings.wallpaper_dir()
+            };
+            match crate::handoff::import(&candidate.path, &catalog_dir) {
+                Ok(dest) => {
+                    *seen = crate::handoff::snapshot(&downloads);
+                    {
+                        let mut domain = self.domain.lock().await;
+                        domain.rescan_wallpapers();
+                    }
+                    let _ = self.events.send(ServerMessage::event(
+                        "wallpaper.changed",
+                        serde_json::json!({
+                            "path": dest.to_string_lossy(),
+                            "handoff": true,
+                            "from": candidate.path.to_string_lossy(),
+                        }),
+                    ));
+                    self.trigger_activity(
+                        ActivityKind::System,
+                        "Wallpaper imported".to_string(),
+                        candidate
+                            .path
+                            .file_name()
+                            .map(|s| s.to_string_lossy().into_owned())
+                            .unwrap_or_default(),
+                        ActivityTone::Good,
+                        "image",
+                        6_000,
+                        false,
+                        Some("handoff".to_string()),
+                    )
+                    .await;
+                }
+                Err(err) => {
+                    tracing::warn!(%err, "browser handoff import failed");
+                }
+            }
         }
     }
 
@@ -1250,6 +1486,27 @@ impl Server {
                 }
                 self.wallpaper_download(id, &url).await
             }
+            "wallpaper.handoff-status" => {
+                let dir = crate::handoff::downloads_dir();
+                let candidates = crate::handoff::newcomers(&dir, &crate::handoff::snapshot(&dir));
+                ServerMessage::reply_with(
+                    id,
+                    serde_json::json!({
+                        "dir": dir.to_string_lossy(),
+                        "pending": candidates.len(),
+                    }),
+                )
+            }
+            "wallpaper.handoff-open" => {
+                let url = arg_string(args.get("url"), "");
+                if url.trim().is_empty() {
+                    return ServerMessage::reply_err(id, "a page url is required");
+                }
+                match crate::handoff::open_page(&url) {
+                    Ok(()) => ServerMessage::reply_ok(id),
+                    Err(err) => ServerMessage::reply_err(id, err),
+                }
+            }
 
             "calendar.events" => {
                 let domain = self.domain.lock().await;
@@ -1323,6 +1580,7 @@ impl Server {
             "context.summary" => {
                 let stats = self.sample().await;
                 let notifications = self.notifications.list().await;
+                let compositor = self.compositor_info.lock().await.clone();
                 let domain = self.domain.lock().await;
                 ServerMessage::reply_with(
                     id,
@@ -1336,8 +1594,13 @@ impl Server {
                         "notifications": notifications,
                         "wallpaper": wallpaper_payload(&domain),
                         "settings": domain.settings,
+                        "compositor": compositor,
                     }),
                 )
+            }
+            "compositor.info" => {
+                let info = self.compositor_info.lock().await.clone();
+                ServerMessage::reply_with(id, serde_json::to_value(&info).unwrap_or_default())
             }
 
             other => ServerMessage::reply_err(id, format!("unknown command: {other}")),

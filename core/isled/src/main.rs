@@ -5,8 +5,10 @@
 // directly yet. Dead code is therefore expected here and is not a smell.
 #[allow(dead_code)]
 mod clipwatch;
+mod compositor;
 mod data;
 mod domain;
+mod handoff;
 #[allow(dead_code)]
 mod icons;
 #[allow(dead_code)]
