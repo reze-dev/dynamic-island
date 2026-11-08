@@ -103,7 +103,7 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 | Phase | What is missing |
 |-------|-----------------|
-| 7 | Stagger is wired (30 ms staggered content cross-fades, reduced-motion aware); a11y spans reduced-motion, high-contrast (Theme colors + shell wiring), visible focus ring, away-collapse, screen-reader names, and keyboard-operable buttons. Easing is tokenized end to end (15 sites on `Theme.emphasized/decelerate/accelerate`; no hardcoded `Easing.*` left). Panel fallbacks cover all ten panels with daemon/missing-service naming, action buttons queued offline (capped 100, FIFO flush on reconnect, "N queued items sent" announce), and tray icons resolved through five levels (named path → attention variant → themed fallback → BMP pixmap → title-initial → generic glyph). Still open: queue persistence across a UI restart (in-memory only), and pixmap LRU budget beyond the 100-file cap. |
+| 7 | Stagger is wired (30 ms staggered content cross-fades, reduced-motion aware); a11y spans reduced-motion, high-contrast (Theme colors + shell wiring), visible focus ring, away-collapse, screen-reader names, and keyboard-operable buttons. Easing is tokenized end to end (15 sites on `Theme.emphasized/decelerate/accelerate`; no hardcoded `Easing.*` left). Panel fallbacks cover all ten panels with daemon/missing-service naming, action buttons queued offline (persisted to `~/.local/state/isle/queue.json`, capped 100, FIFO flush on reconnect, "N queued items sent" announce), and tray icons resolved through five levels (named path → attention variant → themed fallback → BMP pixmap → title-initial → generic glyph). Tray pixmaps share the wallhaven-thumbnail LRU budget (200 MiB combined). Still open: stiffer per-panel fallbacks beyond queue+disable (e.g. cached payload staleness banners), and pixmap TTL beyond the shared LRU budget. |
 | - | System RPM is built and verified (4.3M, `Requires: quickshell >= 0.3.2, mesa-libGL, (awww or hyprpaper), systemd-user`; staged via DNF-downloaded `rpm-build` without root). Runtime quickshell is the Nix store 0.3.2: Fedora's 0.2.1-git was downloaded, extracted, and run — it fails to load the shell at `BackgroundEffect.blurRegion` ("Non-existent attached object") and `Region.radius` ("Cannot assign to non-existent property"), both absent in 0.2.1 qmltypes but present in 0.3.2. The overlay layer itself exists in both, so the blocker is blur glass + rounded masks, not overlay. See `packaging/fedora.yaml` for the qmltypes evidence. Same fallback evidence (170 tests, clippy, lint, overlay) below. |
 
 ## Verified runs
@@ -140,6 +140,18 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
   reconnect preserving ids, `callAndSay` announces "Queued — will send
   when isled is back." and "N queued items sent." on flush. Buttons
   re-enabled (previous disable gates removed) since intents now queue.
+- Queue persistence: `~/.local/state/isle/queue.json` via `FileView` +
+  `mkdir -p` Process; saves gated on `queueRestored` (a startup `ping`
+  cannot overwrite the file before restore reads it). Restored intents
+  get fresh ids and flush on connect. E2E proof 2026-11-09: seeded
+  `[{todos.add, queued-intent-e2e-…}]`, restarted the UI with isled
+  down, reconnected — `todos.list` returned the seeded todo (id 1) and
+  the queue file ended `[]`. Test todo removed afterwards.
+- Shared LRU budget: `cache::prune_all()` + `total_bytes_both()` merge
+  thumbnails + tray pixmaps oldest-first under `cache_max_bytes`.
+  `wallpaper.cache` reports both dirs; `wallpaper.prune` + search-time
+  prune use the shared budget. New test
+  `prune_dirs_shares_one_budget_across_dirs` (175 tests total).
 - `just package-fedora` → `/tmp/isle-fedora.tar.gz` (4.3 MB, no sudo
   needed to install — `install.sh` writes user-local units).
 - System path staged: `DESTDIR=/tmp/opencode/isle-system-test bash

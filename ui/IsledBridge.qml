@@ -22,6 +22,37 @@ QtObject {
         ? explicitSocket
         : (runtimeDir ? runtimeDir + "/isled/isled.sock" : "/tmp/isled/isled.sock")
 
+    // ---- queue persistence ----
+    //
+    // The offline queue above would vanish with the UI process. Persist it
+    // as JSON (name + args, no callbacks — closures cannot be serialised;
+    // callbacks are re-armed only for live calls) so a UI restart re-queues
+    // its intents on the next connect.
+    readonly property string stateDir: Quickshell.env("XDG_STATE_HOME")
+        ? Quickshell.env("XDG_STATE_HOME") + "/isle"
+        : Quickshell.env("HOME") + "/.local/state/isle"
+    readonly property string queuePath: stateDir + "/queue.json"
+
+    /// The offline queue, persisted as JSON.
+    /// Whether the queue has been restored from disk yet. Saves before
+    /// restore would overwrite the file (e.g. the startup `ping` queues
+    /// before FileView finishes loading) — so saves are gated on this.
+    property bool queueRestored: false
+
+    property FileView queueFile: FileView {
+        path: bridge.queuePath
+        onLoaded: bridge.restoreQueue()
+        onLoadFailed: bridge.markQueueRestored()
+    }
+
+    // The state directory has to exist before the queue file can be
+    // written; the daemon creates it for its own store, but the UI needs
+    // it on a fresh install.
+    property Process queueMkdir: Process {
+        command: ["mkdir", "-p", bridge.stateDir]
+        running: true
+    }
+
     property bool connected: false
     /// Whether to reach for the daemon on startup. The preview rig turns it
     /// off when it is only photographing the island.
@@ -302,6 +333,7 @@ QtObject {
                 bridge.lastError = "queued too many commands — dropped " + dropped.name;
             }
             bridge.queuedCount = bridge.queued.length;
+            bridge.saveQueue();
             return id;
         }
         try {
@@ -311,6 +343,61 @@ QtObject {
             bridge.lastError = "could not send " + name + ": " + err;
         }
         return id;
+    }
+
+    /// Persist the offline queue as JSON `{name, args}` entries. Callbacks
+    /// are intentionally not serialised — a restored intent executes
+    /// server-side but its reply callback is lost, which is the correct
+    /// trade: the effect matters, not the confirmation.
+    function saveQueue() {
+        if (!bridge.queueRestored)
+            return;
+        var durable = [];
+        for (var i = 0; i < bridge.queued.length; i++) {
+            var entry = bridge.queued[i];
+            durable.push({ "name": entry.name, "args": entry.args === undefined ? {} : entry.args });
+        }
+        bridge.queueFile.setText(JSON.stringify(durable));
+    }
+
+    /// Mark the queue as restored when the file simply does not exist yet
+    /// (first run). loadFailed still means "nothing was persisted".
+    function markQueueRestored() {
+        bridge.queueRestored = true;
+    }
+
+    /// Restore queued intents from disk, assigning fresh ids so a UI
+    /// restart can never collide with live calls. Flushes immediately if
+    /// the daemon is already connected.
+    function restoreQueue() {
+        bridge.queueRestored = true;
+        var restored = [];
+        try {
+            var text = bridge.queueFile.text();
+            if (text) {
+                var entries = JSON.parse(text);
+                for (var i = 0; i < entries.length && restored.length < bridge.queuedCap; i++) {
+                    var entry = entries[i];
+                    if (!entry || !entry.name)
+                        continue;
+                    var id = bridge.nextId;
+                    bridge.nextId = bridge.nextId + 1;
+                    var message = { "t": "cmd", "id": id, "name": entry.name };
+                    if (entry.args !== undefined && entry.args !== null)
+                        message.args = entry.args;
+                    restored.push(message);
+                }
+            }
+        } catch (err) {
+            // A corrupt queue file must not break the shell; start empty.
+        }
+        if (restored.length > 0) {
+            bridge.queued = restored.concat(bridge.queued);
+            bridge.queuedCount = bridge.queued.length;
+            bridge.saveQueue();
+            if (bridge.connected)
+                bridge.flushQueue();
+        }
     }
 
     /// Flush the offline queue, oldest first, preserving ids so pending
@@ -334,6 +421,7 @@ QtObject {
         }
         bridge.queued = left;
         bridge.queuedCount = left.length;
+        bridge.saveQueue();
         return sent;
     }
 

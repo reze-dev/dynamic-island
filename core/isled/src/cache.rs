@@ -81,15 +81,40 @@ pub fn total_bytes(dir: &Path) -> u64 {
     list(dir).iter().map(|e| e.bytes).sum()
 }
 
+/// Total bytes under both cache directories (thumbnails + tray pixmaps),
+/// which share one LRU budget.
+pub fn total_bytes_both() -> u64 {
+    total_bytes(&thumbs_dir()) + total_bytes(&tray_pixmaps_dir())
+}
+
 /// Prune `dir` until it fits under `budget`. Returns the number of
 /// files removed. `budget == 0` means "remove everything".
+#[allow(dead_code)] // kept for single-dir callers and tests; server uses prune_all
 pub fn prune(dir: &Path, budget: u64) -> Result<usize, String> {
     if !dir.exists() {
         return Ok(0);
     }
-    // sorted oldest-first; index 0 is the least-recently-used.
-    let entries = list(dir);
-    let mut total: u64 = entries.iter().map(|e| e.bytes).sum();
+    prune_dirs(&[dir.to_path_buf()], budget)
+}
+
+/// Prune the shared cache (thumbnails + tray pixmaps) until their
+/// combined size fits under `budget`, oldest-first across both dirs.
+pub fn prune_all(budget: u64) -> Result<usize, String> {
+    prune_dirs(&[thumbs_dir(), tray_pixmaps_dir()], budget)
+}
+
+fn prune_dirs(dirs: &[std::path::PathBuf], budget: u64) -> Result<usize, String> {
+    // Merge entries oldest-first across all dirs.
+    let mut entries: Vec<CacheEntry> = Vec::new();
+    let mut total: u64 = 0;
+    for dir in dirs {
+        for entry in list(dir) {
+            total = total.saturating_add(entry.bytes);
+            entries.push(entry);
+        }
+    }
+    // list() sorts each dir oldest-first; re-sort the merge globally.
+    entries.sort_by_key(|e| std::cmp::Reverse(e.age));
     let mut removed = 0;
     let mut index = 0;
     while total > budget {
@@ -166,5 +191,22 @@ mod tests {
         fs::write(dir.join("a.jpg"), b"x").unwrap();
         assert_eq!(prune(&dir, 1000).unwrap(), 0);
         assert!(dir.join("a.jpg").exists());
+    }
+
+    #[test]
+    fn prune_dirs_shares_one_budget_across_dirs() {
+        // Two dirs under one budget: one 100-byte file must go to fit
+        // 150. Which one goes is mtime order (both files land within the
+        // same second in tests), so assert the total, not the victim.
+        let dir_a = test_dir("shared_a");
+        let dir_b = test_dir("shared_b");
+        fs::write(dir_a.join("a.jpg"), vec![0u8; 100]).unwrap();
+        fs::write(dir_b.join("b.jpg"), vec![0u8; 100]).unwrap();
+        let dirs = vec![dir_a.clone(), dir_b.clone()];
+        let removed = prune_dirs(&dirs, 150).unwrap();
+        assert_eq!(removed, 1);
+        let remaining =
+            fs::read_dir(&dir_a).unwrap().count() + fs::read_dir(&dir_b).unwrap().count();
+        assert_eq!(remaining, 1);
     }
 }

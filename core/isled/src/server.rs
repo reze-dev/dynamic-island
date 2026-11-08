@@ -1716,34 +1716,40 @@ impl Server {
                 ServerMessage::reply_with(id, wallpaper_payload(&domain))
             }
             "wallpaper.cache" => {
-                let dir = crate::cache::thumbs_dir();
-                let entries = crate::cache::list(&dir);
-                let total: u64 = entries.iter().map(|e| e.bytes).sum();
+                let thumb_dir = crate::cache::thumbs_dir();
+                let thumb_entries = crate::cache::list(&thumb_dir);
+                let pixmap_dir = crate::cache::tray_pixmaps_dir();
+                let pixmap_entries = crate::cache::list(&pixmap_dir);
+                let thumb_total: u64 = thumb_entries.iter().map(|e| e.bytes).sum();
+                let pixmap_total: u64 = pixmap_entries.iter().map(|e| e.bytes).sum();
                 let domain = self.domain.lock().await;
                 ServerMessage::reply_with(
                     id,
                     serde_json::json!({
-                        "dir": dir.to_string_lossy(),
-                        "files": entries.len(),
-                        "bytes": total,
+                        "dir": thumb_dir.to_string_lossy(),
+                        "files": thumb_entries.len(),
+                        "bytes": thumb_total,
+                        "pixmap_dir": pixmap_dir.to_string_lossy(),
+                        "pixmap_files": pixmap_entries.len(),
+                        "pixmap_bytes": pixmap_total,
                         "budget": domain.settings.cache_max_bytes,
                         "prune": domain.settings.cache_prune,
                     }),
                 )
             }
             "wallpaper.prune" => {
-                let dir = crate::cache::thumbs_dir();
+                let thumb_dir = crate::cache::thumbs_dir();
                 let budget = {
                     let domain = self.domain.lock().await;
                     domain.settings.cache_max_bytes
                 };
-                match crate::cache::prune(&dir, budget) {
+                match crate::cache::prune_all(budget) {
                     Ok(removed) => ServerMessage::reply_with(
                         id,
                         serde_json::json!({
-                            "dir": dir.to_string_lossy(),
+                            "dir": thumb_dir.to_string_lossy(),
                             "removed": removed,
-                            "bytes": crate::cache::total_bytes(&dir),
+                            "bytes": crate::cache::total_bytes_both(),
                         }),
                     ),
                     Err(err) => ServerMessage::reply_err(id, err),
@@ -2047,12 +2053,11 @@ impl Server {
                     }
                 }
                 result.items = items;
-                // LRU prune the cache against the budget.
+                // LRU prune the shared cache (thumbnails + pixmaps) against the budget.
                 {
                     let domain = self.domain.lock().await;
                     if domain.settings.cache_prune {
-                        let pruned =
-                            crate::cache::prune(&thumb_dir, domain.settings.cache_max_bytes);
+                        let pruned = crate::cache::prune_all(domain.settings.cache_max_bytes);
                         if let Err(err) = pruned {
                             tracing::warn!(%err, "cache prune failed");
                         }
