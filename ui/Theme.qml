@@ -237,6 +237,11 @@ QtObject {
 
     /// How long the island takes to change shape.
     readonly property int morphDuration: 500
+    /// When the user prefers reduced motion, all morphs collapse to
+    /// instant changes.
+    property bool reducedMotion: false
+    /// Boosted text contrast for accessibility.
+    property bool highContrast: false
     /// How long content takes to fade.
     readonly property int crossfadeDuration: 200
     /// How long content takes to slide. Slightly longer than the morph, so

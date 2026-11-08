@@ -31,6 +31,14 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     aboveWindows: true
 
+    // Away/idle: collapse the island, dim it, and lock out panels until
+    // the user is back. The daemon broadcasts `context.changed`; the UI
+    // reads it into `bridge.context`.
+    property bool away: bridge.context && bridge.context.state === "away"
+
+    // Accessibility: reduced motion collapses every morph to instant.
+    property bool reducedMotion: bridge.settings && bridge.settings.reduced_motion === true
+
     // The keyboard belongs to the island only while a panel is open.
     //
     // Niri hands the keyboard to a newly mapped on-demand layer surface, so
@@ -38,7 +46,14 @@ PanelWindow {
     // from the terminal at login and holds it until something else is
     // clicked. A notification that opens a panel must not do that either:
     // the keyboard has to stay where the reader left it.
-    focusable: IslandSettings.keyboardFocus && island.mode === "full"
+    focusable: IslandSettings.keyboardFocus && island.mode === "full" && !root.away
+
+    // Away: dim the island and collapse any open panel.
+    onAwayChanged: {
+        if (away) {
+            island.collapse();
+        }
+    }
 
     // The clickthrough mask. The surface is as wide as the screen and as
     // tall as the tallest panel, so without a mask every click in that

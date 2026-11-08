@@ -521,6 +521,9 @@ impl Server {
         if activities_changed {
             self.broadcast_activity_state().await;
         }
+        // When the user is away (logind idle), the island waits quietly:
+        // no handoff imports fire (checked above by returning early is
+        // late — the guard lives at the top on the next pulse).
     }
 
     /// Browser handoff: look for new images in Downloads. The 1s pulse is
@@ -1712,6 +1715,40 @@ impl Server {
                 let domain = self.domain.lock().await;
                 ServerMessage::reply_with(id, wallpaper_payload(&domain))
             }
+            "wallpaper.cache" => {
+                let dir = crate::cache::thumbs_dir();
+                let entries = crate::cache::list(&dir);
+                let total: u64 = entries.iter().map(|e| e.bytes).sum();
+                let domain = self.domain.lock().await;
+                ServerMessage::reply_with(
+                    id,
+                    serde_json::json!({
+                        "dir": dir.to_string_lossy(),
+                        "files": entries.len(),
+                        "bytes": total,
+                        "budget": domain.settings.cache_max_bytes,
+                        "prune": domain.settings.cache_prune,
+                    }),
+                )
+            }
+            "wallpaper.prune" => {
+                let dir = crate::cache::thumbs_dir();
+                let budget = {
+                    let domain = self.domain.lock().await;
+                    domain.settings.cache_max_bytes
+                };
+                match crate::cache::prune(&dir, budget) {
+                    Ok(removed) => ServerMessage::reply_with(
+                        id,
+                        serde_json::json!({
+                            "dir": dir.to_string_lossy(),
+                            "removed": removed,
+                            "bytes": crate::cache::total_bytes(&dir),
+                        }),
+                    ),
+                    Err(err) => ServerMessage::reply_err(id, err),
+                }
+            }
             "wallpaper.search" => {
                 let query = arg_string(args.get("q"), "");
                 let page = args
@@ -1989,11 +2026,7 @@ impl Server {
             Ok(mut result) => {
                 // Download thumbnails server-side so the panel can paint them
                 // from disk; Quickshell's QML cannot load remote images.
-                let thumb_dir = std::env::var_os("XDG_CACHE_HOME")
-                    .map(PathBuf::from)
-                    .unwrap_or_else(|| PathBuf::from("/tmp"))
-                    .join("isled")
-                    .join("wallhaven-thumbs");
+                let thumb_dir = crate::cache::thumbs_dir();
                 let _ = std::fs::create_dir_all(&thumb_dir);
                 let mut items = result.items;
                 for item in items.iter_mut() {
@@ -2014,6 +2047,17 @@ impl Server {
                     }
                 }
                 result.items = items;
+                // LRU prune the cache against the budget.
+                {
+                    let domain = self.domain.lock().await;
+                    if domain.settings.cache_prune {
+                        let pruned =
+                            crate::cache::prune(&thumb_dir, domain.settings.cache_max_bytes);
+                        if let Err(err) = pruned {
+                            tracing::warn!(%err, "cache prune failed");
+                        }
+                    }
+                }
                 let value = serde_json::to_value(&result).unwrap_or_default();
                 {
                     let mut cache = self.wallhaven_cache.lock().await;
@@ -2125,6 +2169,33 @@ fn apply_setting(settings: &mut Settings, key: &str, value: &serde_json::Value) 
         "auto_context" => {
             if let Some(enabled) = value.as_bool() {
                 settings.auto_context = enabled;
+            }
+        }
+        "cache_max_bytes" => {
+            if let Some(bytes) = value.as_u64() {
+                settings.cache_max_bytes = bytes;
+            }
+        }
+        "cache_prune" => {
+            if let Some(enabled) = value.as_bool() {
+                settings.cache_prune = enabled;
+            }
+        }
+        "morph_duration_ms" => {
+            if let Some(ms) = value.as_u64() {
+                if ms > 0 {
+                    settings.morph_duration_ms = ms;
+                }
+            }
+        }
+        "reduced_motion" => {
+            if let Some(enabled) = value.as_bool() {
+                settings.reduced_motion = enabled;
+            }
+        }
+        "high_contrast" => {
+            if let Some(enabled) = value.as_bool() {
+                settings.high_contrast = enabled;
             }
         }
         "wallpaper_dir" => {

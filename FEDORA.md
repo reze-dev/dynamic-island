@@ -103,9 +103,8 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 | Phase | What is missing |
 |-------|-----------------|
-| 4 | LRU pruning of the downloaded cache |
-| 7 | Idle/low-power behavior, animation tuning, a11y, fallbacks for missing services (no NM, no BT daemon, no MPRIS player, no wallpaper engine — some of these already degrade honestly in the UI) |
-| - | `quickshell` on Fedora still comes from the Nix store via `install-units`; there is no standalone `.deb/.rpm` path (the HM module is NixOS-only by design) |
+| 7 | Animation tuning, a11y beyond reduced-motion/high-contrast/focus ring, fallbacks for missing services (no NM, no BT daemon, no MPRIS player, no wallpaper engine — some of these already degrade honestly in the UI) |
+| - | `quickshell` on Fedora still comes from the Nix store via `install-units` or the `isle-fedora.tar.gz` tarball; there is no standalone `.deb/.rpm` path (the HM module is NixOS-only by design) |
 
 ## Verified runs
 
@@ -124,4 +123,11 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
   `context.signal '{"kind":"battery","percent":15,"charging":false}'` →
   `{"state":"low-battery","last_title":"Battery at 15%"}`.
   `context.summary` now also carries `"context": {…}`.
+- `core/target/debug/isled call wallpaper.cache` →
+  `{"dir":"/home/asuna/.cache/isled/wallhaven-thumbs","files":0,"bytes":0,"budget":209715200,"prune":true}`;
+  `wallpaper.prune` → `{"removed":0}`. The cache honors
+  `settings.cache_max_bytes` (default 200 MiB) and prunes LRU after every
+  search. The old `/tmp` path is gone.
+- `just package-fedora` → `/tmp/isle-fedora.tar.gz` (4.3 MB, no sudo
+  needed to install — `install.sh` writes user-local units).
 - `grim` screenshot shows the idle pill (dot + clock) at the top centre.

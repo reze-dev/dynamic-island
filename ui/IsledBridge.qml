@@ -51,6 +51,8 @@ QtObject {
     property var settings: null
     /// The system tray's items.
     property var tray: []
+    /// The context engine's folded state (idle/busy/away/...).
+    property var context: null
 
     // ---- requests ----
 
@@ -227,6 +229,9 @@ QtObject {
             break;
         case "wallpaper.changed":
             bridge.reloadWallpapers();
+            break;
+        case "context.changed":
+            bridge.context = data;
             break;
         case "session.lagged":
             bridge.lastError = "missed " + data.missed + " events";

@@ -29,6 +29,29 @@ pub struct Settings {
     /// Whether the island reacts to events on its own.
     #[serde(default = "default_true")]
     pub auto_context: bool,
+    /// Wallpaper thumbnail cache budget in bytes. Pruned LRU.
+    #[serde(default = "default_cache_max_bytes")]
+    pub cache_max_bytes: u64,
+    /// Whether to prune the thumbnail cache.
+    #[serde(default = "default_true")]
+    pub cache_prune: bool,
+    /// Morph animation duration in milliseconds.
+    #[serde(default = "default_morph_ms")]
+    pub morph_duration_ms: u64,
+    /// Reduced motion: collapses all morphs to instant changes.
+    #[serde(default)]
+    pub reduced_motion: bool,
+    /// High-contrast mode: boosts text contrast.
+    #[serde(default)]
+    pub high_contrast: bool,
+}
+
+fn default_cache_max_bytes() -> u64 {
+    200 * 1024 * 1024
+}
+
+fn default_morph_ms() -> u64 {
+    500
 }
 
 fn default_loop_secs() -> u64 {
@@ -53,6 +76,11 @@ impl Default for Settings {
             calendar_dir: default_calendar_dir().to_string_lossy().into_owned(),
             theme: default_theme(),
             auto_context: default_true(),
+            cache_max_bytes: default_cache_max_bytes(),
+            cache_prune: default_true(),
+            morph_duration_ms: default_morph_ms(),
+            reduced_motion: false,
+            high_contrast: false,
         }
     }
 }

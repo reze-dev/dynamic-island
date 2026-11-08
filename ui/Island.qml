@@ -117,31 +117,37 @@ Rectangle {
 
     Behavior on width {
         NumberAnimation {
-            duration: Theme.morphDuration
+            duration: Theme.reducedMotion ? 0 : Theme.morphDuration
             easing: Theme.emphasized
         }
     }
     Behavior on height {
         NumberAnimation {
-            duration: Theme.morphDuration
+            duration: Theme.reducedMotion ? 0 : Theme.morphDuration
             easing: Theme.emphasized
         }
     }
     Behavior on radius {
         NumberAnimation {
-            duration: Theme.morphDuration
+            duration: Theme.reducedMotion ? 0 : Theme.morphDuration
             easing: Theme.emphasized
         }
     }
     Behavior on color {
         ColorAnimation {
-            duration: Theme.crossfadeDuration
+            duration: Theme.reducedMotion ? 0 : Theme.crossfadeDuration
         }
     }
     Behavior on border.color {
         ColorAnimation {
-            duration: Theme.crossfadeDuration
+            duration: Theme.reducedMotion ? 0 : Theme.crossfadeDuration
         }
+    }
+    // Accessibility: keyboard focus must be visible.
+    activeFocusOnTab: true
+    onActiveFocusChanged: {
+        if (activeFocus)
+            border.color = Theme.primary;
     }
 
     // ---- reacting ----

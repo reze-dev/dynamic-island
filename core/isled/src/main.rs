@@ -3,6 +3,7 @@
 // The data layer is a coherent API in its own right: the panels are its
 // audience, and the tests below exercise the parts the daemon does not call
 // directly yet. Dead code is therefore expected here and is not a smell.
+mod cache;
 #[allow(dead_code)]
 mod clipwatch;
 mod compositor;

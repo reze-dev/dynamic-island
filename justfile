@@ -78,6 +78,32 @@ release:
 release-committed:
     nix build {{repo}}#isled --print-build-logs
 
+# A standalone tarball for Fedora: the Nix-store isled + quickshell inputs
+# plus the UI and user units. The tarball works without a devshell:
+#
+#   tar xf isle-fedora.tar.gz -C ~/
+#   ~/isle-fedora/install.sh
+#
+# Install.sh copies the binary to ~/.local/bin, the UI to ~/.config/quickshell/isle
+# (overlay layer), writes systemd units and enables them. No sudo needed.
+package-fedora out="/tmp/isle-fedora.tar.gz":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    staging=$(mktemp -d)
+    trap "rm -rf $staging" EXIT
+    mkdir -p "$staging/isle-fedora/bin" "$staging/isle-fedora/ui" "$staging/isle-fedora/systemd"
+    store_isled=$(nix build --no-link --print-out-paths "path:{{repo}}#isled" 2>/dev/null)
+    cp "$store_isled/bin/isled" "$staging/isle-fedora/bin/isled"
+    cp -R {{ui}}/. "$staging/isle-fedora/ui/"
+    cp {{repo}}/systemd/isled.service.template "$staging/isle-fedora/systemd/isled.service.template"
+    cp {{repo}}/systemd/quickshell.service.template "$staging/isle-fedora/systemd/quickshell.service.template"
+    cp {{repo}}/FEDORA.md "$staging/isle-fedora/FEDORA.md"
+    cp {{repo}}/tools/sway-binds.conf "$staging/isle-fedora/sway-binds.conf"
+    printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'HERE="$(cd "$(dirname "$0")" && pwd)"' 'mkdir -p "$HOME/.local/bin" "$HOME/.config/quickshell/isle" "$HOME/.config/systemd/user"' 'install -m 0755 "$HERE/bin/isled" "$HOME/.local/bin/isled"' 'cp -R "$HERE/ui/." "$HOME/.config/quickshell/isle/"' 'QS=$(command -v quickshell || true)' 'if [ -z "$QS" ] || [ ! -x "$QS" ]; then echo "quickshell not found — run: nix build nixpkgs#quickshell" >&2; exit 1; fi' 'MESA=$(nix build --no-link --print-out-paths nixpkgs#mesa 2>/dev/null || true)' 'GLV=$(nix build --no-link --print-out-paths nixpkgs#libglvnd 2>/dev/null || true)' 'sed -e "s|@ISLED_BIN@|$HOME/.local/bin/isled|" -e "s|@QUICKSHELL_BIN@|$QS|" -e "s|@UI_PATH@|$HOME/.config/quickshell/isle|" "$HERE/systemd/quickshell.service.template" > "$HOME/.config/systemd/user/quickshell.service"' 'if [ -n "$MESA" ] && [ -n "$GLV" ]; then awk -v mesa="$MESA" -v glv="$GLV" "/^\[Install\]/ { print \"Environment=LD_LIBRARY_PATH=\" mesa \"/lib:\" glv \"/lib\"; print \"Environment=__GLVND_LIBRARY_PATH=\" mesa \"/lib/libEGL_mesa.so\"; print \"Environment=__GLX_VENDOR_LIBRARY_NAME=mesa\" } { print }" "$HOME/.config/systemd/user/quickshell.service" > "$HOME/.config/systemd/user/quickshell.service.tmp"; mv "$HOME/.config/systemd/user/quickshell.service.tmp" "$HOME/.config/systemd/user/quickshell.service"; fi' 'sed -e "s|@ISLED_BIN@|$HOME/.local/bin/isled|g" "$HERE/systemd/isled.service.template" > "$HOME/.config/systemd/user/isled.service"' 'systemctl --user daemon-reload' 'systemctl --user enable --now isled quickshell' 'echo "installed — overlay confirmed with: swaymsg -t get_tree | grep -A2 quickshell"' 'echo "include $HERE/sway-binds.conf    # add to ~/.config/sway/config"' > "$staging/isle-fedora/install.sh"
+    chmod +x "$staging/isle-fedora/install.sh"
+    tar -czf "{{out}}" -C "$staging" isle-fedora
+    echo "--- {{out}}"
+
 # ------------------------------------------------------------- qml / nix fmt
 
 fmt-nix:
