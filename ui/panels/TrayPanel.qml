@@ -52,7 +52,14 @@ Item {
         visible: panel.items.length === 0
         text: !panel.bridge || !panel.bridge.connected
             ? "isled is not answering — tray items will appear when the daemon is back."
-            : "Nothing in the tray. Launch an app that posts to the tray and it shows up here."
+            : panel.bridge && panel.bridge.trayOwner === "other"
+                ? "Another host (Waybar?) owns the tray bus — stop it and set ISLED_CLAIM_TRAY=1 to use isled's tray."
+                : panel.bridge && panel.bridge.trayOwner === "unknown"
+                    ? "No tray bus answers — start one with ISLED_CLAIM_TRAY=1, or launch an app that posts to the tray."
+                    : "Nothing in the tray. Launch an app that posts to the tray and it shows up here."
+        width: parent.width - Theme.spacing * 2
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.WordWrap
         color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
         font.pixelSize: Theme.type.bodySmall.size

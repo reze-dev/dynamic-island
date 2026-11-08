@@ -26,7 +26,7 @@ use tokio::sync::Mutex;
 use zbus::zvariant::{OwnedValue, Value};
 
 /// The bus name a StatusNotifierHost owns.
-const WATCHER_BUS_NAME: &str = "org.kde.StatusNotifierWatcher";
+pub const WATCHER_BUS_NAME: &str = "org.kde.StatusNotifierWatcher";
 /// Where the watcher object lives.
 const WATCHER_PATH: &str = "/StatusNotifierWatcher";
 /// Where an item's object lives.
@@ -178,6 +178,29 @@ impl Tray {
         items
     }
 
+    /// Whether a bus name is currently owned by anyone.
+    pub async fn has_owner(&self, name: &str) -> bool {
+        let Ok(connection) = zbus::Connection::session().await else {
+            return false;
+        };
+        let proxy = zbus::Proxy::new(
+            &connection,
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
+            "org.freedesktop.DBus",
+        );
+        let Ok(proxy) = proxy.await else {
+            return false;
+        };
+        let Ok(reply) = proxy.call_method("NameHasOwner", &(name,)).await else {
+            return false;
+        };
+        let Ok(owner) = reply.body().deserialize::<bool>() else {
+            return false;
+        };
+        owner
+    }
+
     /// Whether a service still owns its bus name. The in-memory registry
     /// can hold an item whose process died before the next refresh tick;
     /// list answers must not surface such ghosts.
@@ -197,10 +220,10 @@ impl Tray {
         let Ok(reply) = proxy.call_method("NameHasOwner", &(service,)).await else {
             return true;
         };
-        let Ok(owner) = reply.body().deserialize::<zbus::zvariant::OwnedValue>() else {
+        let Ok(owner) = reply.body().deserialize::<bool>() else {
             return true;
         };
-        bool::try_from(owner).unwrap_or(true)
+        owner
     }
 
     /// The known items whose bus name is still owned. This is what
@@ -846,6 +869,33 @@ mod tests {
             "an in-use pixmap touched on read must survive TTL eviction"
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn has_owner_finds_the_bus_itself() {
+        // The bus always owns its own names; this exercises the D-Bus
+        // round-trip without depending on who owns the tray today.
+        let (tx, _) = tokio::sync::broadcast::channel(8);
+        let tray = Tray::new(tx);
+        let _ = tray;
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let owned = rt.block_on(async {
+            let connection = zbus::Connection::session().await.expect("session bus");
+            let proxy = zbus::Proxy::new(
+                &connection,
+                "org.freedesktop.DBus",
+                "/org/freedesktop/DBus",
+                "org.freedesktop.DBus",
+            )
+            .await
+            .expect("proxy");
+            let reply = proxy
+                .call_method("NameHasOwner", &("org.freedesktop.DBus",))
+                .await
+                .expect("call");
+            reply.body().deserialize::<bool>().expect("body")
+        });
+        assert!(owned, "the bus always owns its own name");
     }
 
     #[test]

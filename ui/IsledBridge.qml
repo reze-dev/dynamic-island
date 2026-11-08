@@ -82,6 +82,10 @@ QtObject {
     property var settings: null
     /// The system tray's items.
     property var tray: []
+    /// Who owns the tray bus: "isled", "other" (e.g. Waybar), or
+    /// "unknown" (no bus answers). Drives the tray panel's empty state
+    /// so an empty tray explains itself instead of looking broken.
+    property string trayOwner: "unknown"
     /// The context engine's folded state (idle/busy/away/...).
     property var context: null
 
@@ -498,8 +502,10 @@ QtObject {
 
     function reloadTray() {
         bridge.call("tray.list", {}, function (ok, payload) {
-            if (ok && payload)
+            if (ok && payload) {
                 bridge.tray = payload.items || [];
+                bridge.trayOwner = payload.owner || "unknown";
+            }
         });
     }
 

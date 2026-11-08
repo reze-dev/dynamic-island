@@ -147,6 +147,14 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
   `[{todos.add, queued-intent-e2e-…}]`, restarted the UI with isled
   down, reconnected — `todos.list` returned the seeded todo (id 1) and
   the queue file ended `[]`. Test todo removed afterwards.
+- Tray owner + liveness: `tray.list` reports `owner` (`isled` /
+  `other` / `unknown`) so the tray panel explains an empty tray
+  (Waybar-owned bus vs. not claiming at all) instead of looking broken,
+  and serves only `live_items()` filtered by `NameHasOwner` — a
+  deserialization bug (`OwnedValue` vs bare bool reply) previously kept
+  dead items forever (found live when a killed `fake-tray` stayed
+  listed). Live proof: dead fake excluded, live `copyq` kept, owner
+  flipped `isled`→`other` as the bus changed hands.
 - Shared LRU budget: `cache::prune_all()` + `total_bytes_both()` merge
   thumbnails + tray pixmaps oldest-first under `cache_max_bytes`.
   `wallpaper.cache` reports both dirs; `wallpaper.prune` + search-time

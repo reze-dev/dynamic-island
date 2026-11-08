@@ -38,6 +38,10 @@ pub struct Server {
     /// The system tray. It is a host rather than an item, so it exists even
     /// when the bus name is not claimed: the panel can still say so.
     tray: Tray,
+    /// Whether this daemon actually owns `org.kde.StatusNotifierWatcher`.
+    /// Set when the claim in `serve` succeeds; the tray panel uses it to
+    /// explain an empty tray (Waybar-owned bus vs. not claiming at all).
+    tray_claimed: std::sync::atomic::AtomicBool,
     shutdown: tokio::sync::Notify,
     domain: tokio::sync::Mutex<Domain>,
     /// Whether NetworkManager is on the bus. Worked out once, on the first
@@ -80,6 +84,7 @@ impl Server {
             claim_notifications: claims.notifications,
             claim_tray: claims.tray,
             tray: Tray::new(events),
+            tray_claimed: std::sync::atomic::AtomicBool::new(false),
             shutdown: tokio::sync::Notify::new(),
             domain: tokio::sync::Mutex::new(domain),
             network_manager: tokio::sync::OnceCell::new(),
@@ -147,6 +152,8 @@ impl Server {
         if self.claim_tray {
             match tray::claim(self.tray.clone()).await {
                 Ok((_connection, tray)) => {
+                    self.tray_claimed
+                        .store(true, std::sync::atomic::Ordering::Relaxed);
                     tracing::info!("the system tray is being served by this daemon");
                     tokio::spawn(async move { tray::watch(tray).await });
                 }
@@ -1592,7 +1599,17 @@ impl Server {
             "tray.list" => {
                 let items = self.tray.live_items().await;
                 let payload: Vec<serde_json::Value> = items.iter().map(|i| i.payload()).collect();
-                ServerMessage::reply_with(id, serde_json::json!({ "items": payload }))
+                let owner = if self.tray_claimed.load(std::sync::atomic::Ordering::Relaxed) {
+                    "isled"
+                } else if self.tray.has_owner(crate::tray::WATCHER_BUS_NAME).await {
+                    "other"
+                } else {
+                    "unknown"
+                };
+                ServerMessage::reply_with(
+                    id,
+                    serde_json::json!({ "items": payload, "owner": owner }),
+                )
             }
             "tray.activate" => {
                 let service = arg_string(args.get("service"), "");
