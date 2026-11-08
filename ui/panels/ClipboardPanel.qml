@@ -69,6 +69,7 @@ Item {
             variant: "outlined"
             text: "Capture"
             icon: "copy"
+            enabled: panel.bridge && panel.bridge.connected
             onClicked: panel.bridge
                 ? panel.bridge.callAndSay("clipboard.capture", {}, "Captured the clipboard")
                 : null
@@ -78,6 +79,7 @@ Item {
             variant: "text"
             text: "Clear"
             visible: panel.entries.length > 0
+            enabled: panel.bridge && panel.bridge.connected
             onClicked: panel.bridge
                 ? panel.bridge.callAndSay("clipboard.clear", {}, "Clipboard cleared")
                 : null

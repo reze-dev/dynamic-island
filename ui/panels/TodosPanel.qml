@@ -328,6 +328,7 @@ Item {
                     icon: "refresh"
                     size: 32
                     tooltip: "Restart"
+                    enabled: panel.bridge && panel.bridge.connected
                     onClicked: panel.bridge ? panel.bridge.call("timer.start", {}) : null
                 }
 
@@ -335,6 +336,7 @@ Item {
                     icon: "close"
                     size: 32
                     tooltip: "Stop"
+                    enabled: panel.bridge && panel.bridge.connected
                     onClicked: panel.bridge ? panel.bridge.call("timer.stop", {}) : null
                 }
             }

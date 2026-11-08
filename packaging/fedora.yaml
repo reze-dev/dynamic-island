@@ -41,3 +41,16 @@ rpm_size: 4.3M
 rpm_build_tool: rpm-build (downloaded via dnf, extracted without root)
 requires_sudo_user_local: false
 requires_sudo_system: true
+quickshell_runtime: nix-store-0.3.2
+quickshell_fedora_package: 0.2.1-git-too-old-BackgroundEffect-Region.radius
+# Fedora 0.2.1-git evidence (downloaded + extracted + run 2026-11-09):
+#  - Overlay layer exists in both 0.2.1 and 0.3.2 (WlrLayer values
+#    Background/Bottom/Top/Overlay; aboveWindows line 114 identical).
+#  - 0.2.1 FAILS to load shell.qml twice:
+#    1) @shell.qml[117]: Non-existent attached object (BackgroundEffect;
+#       0.2.1 Wayland qmldir lacks _BackgroundEffect import).
+#    2) @shell.qml[121]: Cannot assign to non-existent property "radius"
+#       (PendingRegion.radius added in 0.3.x; present in Nix qmltypes,
+#       absent in Fedora qmltypes).
+#  - Conclusion: runtime must be Quickshell 0.3.x (Nix store), not Fedora
+#    0.2.1-git. The blocker is blur glass + rounded masks, not overlay.

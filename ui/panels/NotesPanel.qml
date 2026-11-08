@@ -335,6 +335,7 @@ Item {
         icon: "plus"
         size: 28
         tooltip: "New note"
+        enabled: panel.bridge && panel.bridge.connected
         onClicked: panel.newNote()
     }
 }

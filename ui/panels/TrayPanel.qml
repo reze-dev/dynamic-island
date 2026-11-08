@@ -88,7 +88,9 @@ Item {
 
                     // The icon. An item that names a file gets it; one that
                     // only names an icon gets a generic glyph, because the
-                    // theme may not have it.
+                    // theme may not have it. When even the name is absent
+                    // (pixmap-only items), the title's first letter stands
+                    // in, so distinct apps stay distinct.
                     Item {
                         width: parent.width
                         height: 40
@@ -107,9 +109,34 @@ Item {
                             smooth: true
                         }
 
+                        Rectangle {
+                            anchors.centerIn: parent
+                            visible: !iconImage.visible
+                                       && modelData.title !== undefined
+                                       && modelData.title !== ""
+                                       && modelData.title !== null
+                            width: 32
+                            height: 32
+                            radius: 8
+                            color: Theme.surfaceFillHighest
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData.title.charAt(0).toUpperCase()
+                                color: Theme.onSurface
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.type.titleMedium.size
+                                font.weight: Theme.type.titleMedium.weight
+                                font.letterSpacing: Theme.type.titleMedium.tracking
+                            }
+                        }
+
                         Icon {
                             anchors.centerIn: parent
                             visible: !iconImage.visible
+                                     && !(modelData.title !== undefined
+                                          && modelData.title !== ""
+                                          && modelData.title !== null)
                             name: "grid"
                             width: 26
                             height: 26
