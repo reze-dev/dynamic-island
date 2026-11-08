@@ -12,12 +12,27 @@ import "../components"
 // daemon, because none of it is state the shell owns — it is the machine's
 // state, and the machine already has good ways to ask.
 //
-// The top of the panel is a grid of tiles: one per thing, each saying
-// whether it is live. Underneath them are the lists, which are the detail.
+// When a service is missing the panel says so (rather than rendering a
+// blank page): "No wifi adapter" vs "No networks", "No bluetooth adapter"
+// vs "No bluetooth devices", and the battery tile simply disappears when
+// there is no battery to report on.
 Item {
     id: panel
 
     property var bridge: null
+
+    // ---- service availability ----
+
+    // Networking.devices is empty when NetworkManager is unreachable (or
+    // has no adapters). wifiEnabled stays false in that case.
+    readonly property bool nmPresent: {
+        var devs = Networking.devices;
+        return devs && devs.values && devs.values.length > 0;
+    }
+    readonly property bool btPresent: {
+        var ads = Bluetooth.adapters;
+        return ads && ads.values && ads.values.length > 0;
+    }
 
     // ---- network ----
 
@@ -91,9 +106,11 @@ Item {
             icon: "wifi"
             label: "Wi-Fi"
             active: Networking.wifiEnabled
-            detail: panel.wifiDevices.length > 0
-                ? panel.wifiDevices.length + " adapter" + (panel.wifiDevices.length > 1 ? "s" : "")
-                : "no adapter"
+            detail: !panel.nmPresent
+                ? "NetworkManager not running"
+                : (panel.wifiDevices.length > 0
+                    ? panel.wifiDevices.length + " adapter" + (panel.wifiDevices.length > 1 ? "s" : "")
+                    : "no adapter")
 
             Toggle {
                 id: wifiToggle
@@ -133,9 +150,9 @@ Item {
             active: panel.adapters && panel.adapters.values && panel.adapters.values.length > 0
                 ? panel.adapters.values[0].enabled
                 : false
-            detail: panel.adapters && panel.adapters.values && panel.adapters.values.length > 0
-                ? (panel.adapters.values[0].enabled ? "on" : "off")
-                : "no adapter"
+            detail: !panel.btPresent
+                ? "Bluetooth daemon not running"
+                : (panel.adapters.values[0].enabled ? "on" : "off")
         }
 
         Tile {
@@ -275,7 +292,18 @@ Item {
 
     Text {
         anchors.centerIn: networks
-        visible: panel.wifiDevices.length === 0
+        visible: !panel.nmPresent
+        text: "NetworkManager is not running."
+        color: Theme.onSurfaceVariant
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
+    }
+
+    Text {
+        anchors.centerIn: networks
+        visible: panel.nmPresent && panel.wifiDevices.length === 0
         text: "No wifi networks."
         color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
@@ -459,7 +487,18 @@ Item {
 
     Text {
         anchors.centerIn: bluetoothList
-        visible: bluetoothList.count === 0
+        visible: !panel.btPresent
+        text: "Bluetooth daemon is not running."
+        color: Theme.onSurfaceVariant
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.type.bodySmall.size
+        font.weight: Theme.type.bodySmall.weight
+        font.letterSpacing: Theme.type.bodySmall.tracking
+    }
+
+    Text {
+        anchors.centerIn: bluetoothList
+        visible: panel.btPresent && bluetoothList.count === 0
         text: "No bluetooth devices."
         color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily

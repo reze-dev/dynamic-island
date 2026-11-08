@@ -55,7 +55,7 @@ Item {
         note: panel.hasPlayer ? "MPRIS" : ""
     }
 
-    // The empty state.
+    // The empty state — and why it is empty.
     Column {
         anchors.centerIn: parent
         spacing: Theme.spacingTight
@@ -77,6 +77,16 @@ Item {
             font.pixelSize: Theme.type.bodySmall.size
             font.weight: Theme.type.bodySmall.weight
             font.letterSpacing: Theme.type.bodySmall.tracking
+        }
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "Open a player that speaks MPRIS (VLC, mpv, Spotify, …)"
+            color: Theme.onSurfaceVariant
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.type.labelSmall.size
+            font.weight: Theme.type.labelSmall.weight
+            font.letterSpacing: Theme.type.labelSmall.tracking
         }
     }
 

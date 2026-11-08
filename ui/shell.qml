@@ -33,11 +33,12 @@ PanelWindow {
 
     // Away/idle: collapse the island, dim it, and lock out panels until
     // the user is back. The daemon broadcasts `context.changed`; the UI
-    // reads it into `bridge.context`.
+    // reads it into `bridge.context`. Boosted contrast lifts the text.
     property bool away: bridge.context && bridge.context.state === "away"
-
-    // Accessibility: reduced motion collapses every morph to instant.
-    property bool reducedMotion: bridge.settings && bridge.settings.reduced_motion === true
+    property bool reducedMotion: bridge.settings
+        && bridge.settings.reduced_motion === true
+    property bool highContrast: bridge.settings
+        && bridge.settings.high_contrast === true
 
     // The keyboard belongs to the island only while a panel is open.
     //

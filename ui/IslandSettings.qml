@@ -4,9 +4,10 @@ import QtQuick
 
 // Settings for the shell itself.
 //
-// These are read at startup and are not saved anywhere: they exist so the
-// behaviour that is still being judged by eye can be flipped without a
-// rebuild.
+// The morph duration, reduced-motion and high-contrast flags live in the
+// daemon's Settings (editable via `settings.set`) because they should
+// survive a restart; these stay as fast, read-only behaviour switches
+// so the feel can be judged by eye without a rebuild.
 QtObject {
     /// 0 — the surface is full width and only the island inside it changes
     ///     shape. This is what Quickshell makes easy, and it never
@@ -27,6 +28,10 @@ QtObject {
     /// How long a triggered island stays open before it folds away, in
     /// milliseconds. The daemon can override this per activity.
     property int defaultDwell: 5000
+
+    /// When the user prefers reduced motion, all morphs are instant.
+    /// Wired from `settings.reduced_motion` at startup.
+    property bool reducedMotion: false
 
     readonly property string approachName: morphApproach === 0
         ? "B: fixed surface, animated island"

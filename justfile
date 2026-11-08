@@ -395,7 +395,7 @@ ui-check:
     fi
     echo "qml loads clean"
 
-# ------------------------------------------------------------------ the demo
+# -------------------------------------------------------------- the demo
 
 # A scripted demo: the daemon on a scratch socket, the real shell, and a
 # sequence of events the island reacts to. Watch it on the screen.
@@ -506,6 +506,24 @@ tray title="Fake Item" icon="mpv":
     cd {{repo}}/core
     cargo build --offline --example fake-tray 2>/dev/null
     ./target/debug/examples/fake-tray --title "{{title}}" --icon "{{icon}}"
+
+fallback-status:
+    @echo "== daemon =="
+    @systemctl --user is-active {{daemon}} {{shell}}
+    @echo ""
+    @echo "== tray =="
+    @core/target/debug/isled call tray.list '{}' 2>&1 | head -c 300; echo ""
+    @echo "== wallpaper =="
+    @core/target/debug/isled call wallpaper.cache 2>&1 | head -c 400; echo ""
+    @echo ""
+    @echo "== tray host active? =="
+    @busctl --user status org.kde.StatusNotifierWatcher 2>&1 | head -3 || echo "no StatusNotifierWatcher owner"
+    @echo ""
+    @echo "== compositor =="
+    @core/target/debug/isled call compositor.info 2>&1 | head -c 400; echo ""
+    @echo ""
+    @echo "== context =="
+    @core/target/debug/isled call context.signal '{"kind":"busy"}' 2>&1 | head -c 300; echo ""
 
 # ------------------------------------------------------------ scratch dirs
 

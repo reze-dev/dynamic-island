@@ -103,7 +103,7 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 | Phase | What is missing |
 |-------|-----------------|
-| 7 | Animation tuning, a11y beyond reduced-motion/high-contrast/focus ring, fallbacks for missing services (no NM, no BT daemon, no MPRIS player, no wallpaper engine — some of these already degrade honestly in the UI) |
+| 7 | Phase 7 polish now covers: reduced-motion, high-contrast, visible focus ring, away-collapse, morph duration from settings, and panel fallbacks (NetworkManager daemon, Bluetooth daemon, MPRIS player, wallpaper engine down — each now names the missing service rather than rendering blank). Still open: deeper animation tuning beyond token defaults, and per-panel missing-service fallbacks beyond Network/MPRIS (e.g. no MPRIS shows a hint row; wallpaper engine down already falls back to the catalog) |
 | - | `quickshell` on Fedora still comes from the Nix store via `install-units` or the `isle-fedora.tar.gz` tarball; there is no standalone `.deb/.rpm` path (the HM module is NixOS-only by design) |
 
 ## Verified runs
