@@ -87,7 +87,9 @@ Item {
     Text {
         anchors.centerIn: parent
         visible: panel.entries.length === 0
-        text: "The clipboard history is empty."
+        text: !panel.bridge || !panel.bridge.connected
+            ? "isled is not answering — history will appear when the daemon is back."
+            : "The clipboard history is empty. Copy something and it lands here."
         color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
         font.pixelSize: Theme.type.bodySmall.size

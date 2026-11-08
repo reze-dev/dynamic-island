@@ -35,7 +35,9 @@
 build_type: user-local-tarball
 system_install: packaging/install-system.sh
 system_rpm_spec: packaging/dynamic-island.spec
-rpm_built_in_devshell: false
-rpm_build_tool_absent: rpmbuild
+rpm_built: true
+rpm_path: /tmp/opencode/x86_64/dynamic-island-0.1.0-1.fc45.x86_64.rpm
+rpm_size: 4.3M
+rpm_build_tool: rpm-build (downloaded via dnf, extracted without root)
 requires_sudo_user_local: false
 requires_sudo_system: true

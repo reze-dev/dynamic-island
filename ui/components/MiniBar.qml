@@ -43,7 +43,7 @@ Item {
         Behavior on width {
             NumberAnimation {
                 duration: Theme.crossfadeDuration
-                easing.type: Easing.OutQuart
+                easing: Theme.decelerate
             }
         }
     }

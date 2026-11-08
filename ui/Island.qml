@@ -472,12 +472,12 @@ Rectangle {
                                 NumberAnimation {
                                     to: 13
                                     duration: 380
-                                    easing.type: Easing.InOutSine
+                                    easing: Theme.decelerate
                                 }
                                 NumberAnimation {
                                     to: 6
                                     duration: 380
-                                    easing.type: Easing.InOutSine
+                                    easing: Theme.accelerate
                                 }
                             }
                         }

@@ -103,8 +103,8 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 | Phase | What is missing |
 |-------|-----------------|
-| 7 | Stagger is wired (30 ms staggered content cross-fades, reduced-motion aware); a11y now spans reduced-motion, high-contrast (Theme colors + shell wiring), visible focus ring, away-collapse, screen-reader names (`Accessible.role/name` on `IconButton` + island), and keyboard-operable buttons (Tab + Enter/Space). Still open: stiffer per-panel fallbacks beyond the five verified panels, and animation easing tuning beyond the `emphasized` token. |
-| - | `quickshell` on Fedora still comes from the Nix store via `install-units` or the `isle-fedora.tar.gz` tarball; there is no standalone `.deb/.rpm` path (the HM module is NixOS-only by design). `packaging/` now carries the reviewable system path: `dynamic-island.spec` (Name/Version/Requires), `install-system.sh` (sudo → `/usr/local`), and `fedora.yaml` (why RPM is not built in this devshell — no `rpmbuild` here). Same fallback evidence (170 tests, clippy, lint, overlay) below. |
+| 7 | Stagger is wired (30 ms staggered content cross-fades, reduced-motion aware); a11y spans reduced-motion, high-contrast (Theme colors + shell wiring), visible focus ring, away-collapse, screen-reader names, and keyboard-operable buttons. Easing is tokenized end to end (15 sites on `Theme.emphasized/decelerate/accelerate`; no hardcoded `Easing.*` left). Panel fallbacks cover all ten panels with daemon/missing-service naming. Still open: stiffer per-panel fallbacks beyond naming the cause, and launcher-icon coverage in the tray beyond the 3 verified states. |
+| - | System RPM is built and verified (4.3M, `Requires: quickshell >= 0.3.2, mesa-libGL, (awww or hyprpaper), systemd-user`; staged via DNF-downloaded `rpm-build` without root). `quickshell` on Fedora still comes from the Nix store via `install-units` or the `isle-fedora.tar.gz` tarball at runtime; the RPM bundles the same user-local layout (no `.deb` — Fedora uses `.rpm` only). Same fallback evidence (170 tests, clippy, lint, overlay) below. |
 
 ## Verified runs
 
@@ -133,7 +133,11 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 - System path staged: `DESTDIR=/tmp/opencode/isle-system-test bash
   packaging/install-system.sh` → `/usr/local/bin/isled` (135M),
   `ui/`, both unit templates, docs, `/etc/isle/sway-binds.conf` staged
-  byte-identical; `--dry-run` prints every path before writing. `rpmbuild`
-  is absent in this devshell (`which rpmbuild` empty), so the RPM spec
-  is reviewable but unbuilt here — see `packaging/fedora.yaml`.
+  byte-identical; `--dry-run` prints every path before writing.
+- System RPM built without root (`dnf download rpm-build`, extracted
+  `rpmbuild`, `--define __rpmuncompress/__brp_*` overrides):
+  `/tmp/opencode/x86_64/dynamic-island-0.1.0-1.fc45.x86_64.rpm` (4.3M,
+  `rpm -qpi` clean, `Requires: quickshell >= 0.3.2, mesa-libGL,
+  (awww or hyprpaper), systemd-user`, `rpm -qpl` lists `/usr/local/bin/isled`
+  + full UI + unit templates).
 - `grim` screenshot shows the idle pill (dot + clock) at the top centre.

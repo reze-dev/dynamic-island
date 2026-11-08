@@ -46,21 +46,21 @@ Item {
         Behavior on x {
             NumberAnimation {
                 duration: Theme.stateLayerDuration
-                easing.type: Easing.OutQuart
+                easing: Theme.decelerate
             }
         }
 
         Behavior on width {
             NumberAnimation {
                 duration: Theme.stateLayerDuration
-                easing.type: Easing.OutQuart
+                easing: Theme.decelerate
             }
         }
 
         Behavior on height {
             NumberAnimation {
                 duration: Theme.stateLayerDuration
-                easing.type: Easing.OutQuart
+                easing: Theme.decelerate
             }
         }
     }

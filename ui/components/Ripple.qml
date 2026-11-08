@@ -51,7 +51,7 @@ Item {
         from: 0
         to: 1
         duration: Theme.rippleDuration
-        easing.type: Easing.OutQuart
+        easing: Theme.decelerate
     }
 
     NumberAnimation {
@@ -60,7 +60,7 @@ Item {
         property: "opacity"
         to: 0
         duration: Theme.rippleFadeDuration
-        easing.type: Easing.InQuad
+        easing: Theme.accelerate
     }
 
     /// Send the wave out from a point.

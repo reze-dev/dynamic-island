@@ -710,6 +710,7 @@ Item {
     }
 
     Text {
+        id: localEmptyText
         anchors.centerIn: scroller
         visible: panel.tab === "local" && panel.items.length === 0
         text: "No images in that directory."
@@ -718,5 +719,20 @@ Item {
         font.pixelSize: Theme.type.bodySmall.size
         font.weight: Theme.type.bodySmall.weight
         font.letterSpacing: Theme.type.bodySmall.tracking
+    }
+
+    Text {
+        anchors.top: localEmptyText.bottom
+        anchors.topMargin: 2
+        anchors.horizontalCenter: scroller.horizontalCenter
+        width: scroller.width
+        visible: panel.tab === "local" && panel.items.length === 0
+        text: "Drop images in there, browse Wallhaven, or paste a page URL in Imported."
+        color: Theme.onSurfaceVariant
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.type.labelSmall.size
+        font.weight: Theme.type.labelSmall.weight
+        font.letterSpacing: Theme.type.labelSmall.tracking
+        horizontalAlignment: Text.AlignHCenter
     }
 }

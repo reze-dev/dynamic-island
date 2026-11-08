@@ -104,14 +104,32 @@ Item {
             height: Math.max(44, panel.highlights.length * 50)
 
             Text {
+                id: nothingText
                 anchors.centerIn: parent
                 visible: panel.highlights.length === 0
-                text: "Nothing has asked for your attention."
+                text: !panel.bridge || !panel.bridge.connected
+                    ? "isled is not answering — signals will land here when the daemon is back."
+                    : "Nothing has asked for your attention."
                 color: Theme.onSurfaceVariant
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.type.bodySmall.size
                 font.weight: Theme.type.bodySmall.weight
                 font.letterSpacing: Theme.type.bodySmall.tracking
+            }
+
+            Text {
+                anchors.top: nothingText.bottom
+                anchors.topMargin: 2
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width
+                visible: panel.highlights.length === 0 && panel.bridge && panel.bridge.connected
+                text: "Copy something, pin a todo, or wait for the machine to speak."
+                color: Theme.onSurfaceVariant
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.type.labelSmall.size
+                font.weight: Theme.type.labelSmall.weight
+                font.letterSpacing: Theme.type.labelSmall.tracking
+                horizontalAlignment: Text.AlignHCenter
             }
 
             Column {

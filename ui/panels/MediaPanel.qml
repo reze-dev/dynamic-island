@@ -210,7 +210,7 @@ Item {
                 Behavior on width {
                     NumberAnimation {
                         duration: 700
-                        easing.type: Easing.Linear
+                        easing: Theme.decelerate
                     }
                 }
             }

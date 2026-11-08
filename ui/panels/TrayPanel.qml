@@ -40,7 +40,9 @@ Item {
     Text {
         anchors.centerIn: parent
         visible: panel.items.length === 0
-        text: "Nothing in the tray."
+        text: !panel.bridge || !panel.bridge.connected
+            ? "isled is not answering — tray items will appear when the daemon is back."
+            : "Nothing in the tray. Launch an app that posts to the tray and it shows up here."
         color: Theme.onSurfaceVariant
         font.family: Theme.fontFamily
         font.pixelSize: Theme.type.bodySmall.size
