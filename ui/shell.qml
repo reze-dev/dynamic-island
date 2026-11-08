@@ -33,20 +33,20 @@ PanelWindow {
 
     // Away/idle: collapse the island, dim it, and lock out panels until
     // the user is back. The daemon broadcasts `context.changed`; the UI
-    // reads it into `bridge.context`. Boosted contrast lifts the text.
-    property bool away: bridge.context && bridge.context.state === "away"
-    property bool reducedMotion: bridge.settings
-        && bridge.settings.reduced_motion === true
-    property bool highContrast: bridge.settings
-        && bridge.settings.high_contrast === true
+    // reads it into `isled.context`. Boosted contrast lifts the text.
+    property bool away: isled.context && isled.context.state === "away"
+    property bool reducedMotion: isled.settings
+        && isled.settings.reduced_motion === true
+    property bool highContrast: isled.settings
+        && isled.settings.high_contrast === true
 
     // The morph duration the daemon resolved for the shell, straight
     // from settings — so `settings.set '{"key":"morph_duration_ms",…}'`
     // actually changes the feel without a rebuild.
-    property int morphDuration: (bridge.settings
-        && bridge.settings.morph_duration_ms !== undefined
-        && bridge.settings.morph_duration_ms > 0)
-        ? bridge.settings.morph_duration_ms
+    property int morphDuration: (isled.settings
+        && isled.settings.morph_duration_ms !== undefined
+        && isled.settings.morph_duration_ms > 0)
+        ? isled.settings.morph_duration_ms
         : Theme.morphDuration
 
     // The keyboard belongs to the island only while a panel is open.
@@ -64,6 +64,14 @@ PanelWindow {
             island.collapse();
         }
     }
+
+    // Push a11y/motion settings into the Theme singleton so colors and
+    // stagger/crossfade bindings pick them up without a rebuild.
+    // (Component.onCompleted itself is merged at the bottom of the file —
+    // QML allows only one.)
+    onReducedMotionChanged: Theme.reducedMotion = reducedMotion
+    onHighContrastChanged: Theme.highContrast = highContrast
+    onMorphDurationChanged: Theme.morphDuration = morphDuration
 
     // The clickthrough mask. The surface is as wide as the screen and as
     // tall as the tallest panel, so without a mask every click in that
@@ -183,7 +191,11 @@ PanelWindow {
         island.open();
     }
 
+    // Startup: push a11y/motion settings into the Theme singleton and ping
+    // the daemon so the bridge warms the socket before the first panel.
     Component.onCompleted: {
+        Theme.reducedMotion = reducedMotion;
+        Theme.highContrast = highContrast;
         root.isled.call("ping");
     }
 }

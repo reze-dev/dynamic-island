@@ -86,6 +86,10 @@ Rectangle {
         return "spark";
     }
 
+    // Screen-reader label: announces state changes (idle/peek/triggered/full).
+    Accessible.role: Accessible.Application
+    Accessible.name: "Dynamic Island — " + displayState
+
     // ---- geometry ----
 
     readonly property int targetWidth: {
@@ -217,7 +221,10 @@ Rectangle {
     }
 
     // ---- idle: a dot and the clock ----
-
+    // Content appears in order — idle 0, peek 1, triggered 2, full 3 — so
+    // the shape settles before the text does. The PauseAnimation is the
+    // stagger: incoming content waits index * staggerDuration, outgoing
+    // content leaves immediately. Reduced motion collapses both to instant.
     Item {
         id: idleContent
         anchors.fill: parent
@@ -225,8 +232,17 @@ Rectangle {
         visible: opacity > 0.01
 
         Behavior on opacity {
-            NumberAnimation {
-                duration: Theme.crossfadeDuration
+            SequentialAnimation {
+                PauseAnimation {
+                    duration: island.reducedMotion
+                        ? 0
+                        : island.displayState === "idle"
+                            ? 0 * Theme.staggerDuration
+                            : 0
+                }
+                NumberAnimation {
+                    duration: island.reducedMotion ? 0 : Theme.crossfadeDuration
+                }
             }
         }
 
@@ -278,8 +294,17 @@ Rectangle {
         visible: opacity > 0.01
 
         Behavior on opacity {
-            NumberAnimation {
-                duration: Theme.crossfadeDuration
+            SequentialAnimation {
+                PauseAnimation {
+                    duration: island.reducedMotion
+                        ? 0
+                        : island.displayState === "peek"
+                            ? 1 * Theme.staggerDuration
+                            : 0
+                }
+                NumberAnimation {
+                    duration: island.reducedMotion ? 0 : Theme.crossfadeDuration
+                }
             }
         }
 
@@ -379,8 +404,17 @@ Rectangle {
         visible: opacity > 0.01
 
         Behavior on opacity {
-            NumberAnimation {
-                duration: Theme.crossfadeDuration
+            SequentialAnimation {
+                PauseAnimation {
+                    duration: island.reducedMotion
+                        ? 0
+                        : island.displayState === "triggered"
+                            ? 2 * Theme.staggerDuration
+                            : 0
+                }
+                NumberAnimation {
+                    duration: island.reducedMotion ? 0 : Theme.crossfadeDuration
+                }
             }
         }
 
@@ -462,8 +496,17 @@ Rectangle {
         visible: opacity > 0.01
 
         Behavior on opacity {
-            NumberAnimation {
-                duration: Theme.crossfadeDuration
+            SequentialAnimation {
+                PauseAnimation {
+                    duration: island.reducedMotion
+                        ? 0
+                        : island.displayState === "full"
+                            ? 3 * Theme.staggerDuration
+                            : 0
+                }
+                NumberAnimation {
+                    duration: island.reducedMotion ? 0 : Theme.crossfadeDuration
+                }
             }
         }
 

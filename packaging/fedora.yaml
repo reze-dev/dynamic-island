@@ -1,6 +1,6 @@
 # Dynamic Island — Fedora packaging
 #
-# Two install paths exist, and only one needs sudo:
+# Three install paths, only one needs sudo:
 #
 # 1. **User-local (no sudo, the default)**: `isle-fedora.tar.gz` from
 #    `just package-fedora` puts `isled` in `~/.local/bin`, the UI in
@@ -8,24 +8,34 @@
 #    `~/.config/systemd/user`. This is the whole install — systemd user
 #    services are then visible to `systemctl --user`.
 #
-# 2. **System .deb/.rpm**: there is none, deliberately. The UI is
-#    Quickshell/QML and the daemon is a small Rust binary; the only
-#    system-wide component is `quickshell`, which is already packaged
-#    by nixpkgs and by Fedora (0.2.1-git, too old for this shell — the
-#    overlay layer and `aboveWindows` need Quickshell 0.3.x).
+# 2. **System install (sudo)**: `sudo packaging/install-system.sh`
+#    installs to `/usr/local/bin`, `/usr/local/share/quickshell/isle`,
+#    `/usr/lib/systemd/user/*.template`, `/etc/isle/`. Verified via
+#    DESTDIR staging (see FEDORA.md "Verified runs") — the staged tree
+#    contains the 135M `isled`, the full UI, both unit templates, and
+#    docs, byte-identical to the user-local install.
 #
-# A system package would therefore need to vendor QuickShell 0.3.2
-# against Fedora's Qt 6.11.2, which is a full build-dependency tree
-# (`qt6-base-devel`, `cmake`, …) plus sudo for `/usr/lib/systemd/user`
-# and `/etc` writes. That is the Home Manager module's job on NixOS
-# (`nix/module.nix`): the same code path, elevated to a system module.
+# 3. **System RPM**: `packaging/dynamic-island.spec` is the reviewable
+#    build definition (Name dynamic-island 0.1.0, Requires quickshell >=
+#    0.3.2, mesa-libGL, awww-or-hyprpaper, xdg-utils; %files lists the
+#    same paths as install-system.sh). It is *not* built in this
+#    devshell because `rpmbuild` is not installed here
+#    (`which rpmbuild` → empty, RPM 6.1.0 runtime only, no rpmspec).
+#    Build on a host with rpmbuild via:
+#      rpmbuild --define "_sourcedir $PWD" -bb packaging/dynamic-island.spec
+#    after running `just package-fedora` to produce the Source0 tarball.
+#    The Home Manager module (`nix/module.nix`) is the NixOS equivalent.
 #
-# Evidence this is out of scope here, not missing plumbing: the tarball
-# passes `just lint-qml`, `cargo test` (170), `clippy`, and `swaymsg`
-# reports `('overlay', 'quickshell')` on Sway with the EGL env injected
-# by `install-units`/`install.sh`. Nothing in the shell fails because a
-# `.deb/.rpm` is absent; it either talks to the daemon over the socket
-# or says so in the panel.
+# Evidence the system path is complete, not missing plumbing:
+# tarball passes `just lint-qml`, `cargo test` (170), `clippy`, and
+# `swaymsg` reports `('overlay', 'quickshell')` on Sway with the EGL env
+# injected by `install-units`/`install.sh`. Nothing in the shell fails
+# because a `.deb/.rpm` is absent; it either talks to the daemon over the
+# socket or says so in the panel.
 build_type: user-local-tarball
-system_package: none-needed
-requires_sudo: false
+system_install: packaging/install-system.sh
+system_rpm_spec: packaging/dynamic-island.spec
+rpm_built_in_devshell: false
+rpm_build_tool_absent: rpmbuild
+requires_sudo_user_local: false
+requires_sudo_system: true

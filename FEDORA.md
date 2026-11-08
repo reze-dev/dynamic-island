@@ -103,8 +103,8 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 | Phase | What is missing |
 |-------|-----------------|
-| 7 | Animation tuning beyond token defaults (morph duration is now settings-tunable, `settings.set '{"key":"morph_duration_ms","value":700}'`; stagger token exists at 30 ms but is not yet wired into content cross-fades), a11y beyond reduced-motion/high-contrast/focus ring/away-collapse, and per-panel missing-service fallbacks beyond Network/MPRIS/Todos/Calendar/Notes (e.g. no MPRIS shows a hint row; wallpaper engine down already falls back to the catalog) |
-| - | `quickshell` on Fedora still comes from the Nix store via `install-units` or the `isle-fedora.tar.gz` tarball; there is no standalone `.deb/.rpm` path (the HM module is NixOS-only by design). `packaging/fedora.yaml` documents why this is out of scope: no system component requires sudo, and the fallback evidence (170 tests, clippy, lint, overlay) is in this file. |
+| 7 | Stagger is wired (30 ms staggered content cross-fades, reduced-motion aware); a11y now spans reduced-motion, high-contrast (Theme colors + shell wiring), visible focus ring, away-collapse, screen-reader names (`Accessible.role/name` on `IconButton` + island), and keyboard-operable buttons (Tab + Enter/Space). Still open: stiffer per-panel fallbacks beyond the five verified panels, and animation easing tuning beyond the `emphasized` token. |
+| - | `quickshell` on Fedora still comes from the Nix store via `install-units` or the `isle-fedora.tar.gz` tarball; there is no standalone `.deb/.rpm` path (the HM module is NixOS-only by design). `packaging/` now carries the reviewable system path: `dynamic-island.spec` (Name/Version/Requires), `install-system.sh` (sudo → `/usr/local`), and `fedora.yaml` (why RPM is not built in this devshell — no `rpmbuild` here). Same fallback evidence (170 tests, clippy, lint, overlay) below. |
 
 ## Verified runs
 
@@ -130,4 +130,10 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
   search. The old `/tmp` path is gone.
 - `just package-fedora` → `/tmp/isle-fedora.tar.gz` (4.3 MB, no sudo
   needed to install — `install.sh` writes user-local units).
+- System path staged: `DESTDIR=/tmp/opencode/isle-system-test bash
+  packaging/install-system.sh` → `/usr/local/bin/isled` (135M),
+  `ui/`, both unit templates, docs, `/etc/isle/sway-binds.conf` staged
+  byte-identical; `--dry-run` prints every path before writing. `rpmbuild`
+  is absent in this devshell (`which rpmbuild` empty), so the RPM spec
+  is reviewable but unbuilt here — see `packaging/fedora.yaml`.
 - `grim` screenshot shows the idle pill (dot + clock) at the top centre.

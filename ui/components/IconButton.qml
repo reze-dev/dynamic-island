@@ -35,6 +35,14 @@ Item {
     implicitHeight: size
     opacity: enabled ? 1 : 0.38
 
+    // Accessibility: screen readers announce the tooltip/icon as the
+    // button name, keyboard users can tab to it and press Enter/Space.
+    Accessible.role: Accessible.Button
+    Accessible.name: tooltip !== "" ? tooltip : icon
+    activeFocusOnTab: true
+    Keys.onReturnPressed: clicked()
+    Keys.onSpacePressed: clicked()
+
     readonly property bool filledVariant: variant === "filled" || (selected && variant === "standard")
     readonly property bool tonalVariant: variant === "tonal"
     readonly property bool outlinedVariant: variant === "outlined"
@@ -70,8 +78,8 @@ Item {
         anchors.fill: parent
         radius: width / 2
         color: root.plateColor
-        border.width: root.outlinedVariant ? 1 : 0
-        border.color: Theme.outline
+        border.width: root.outlinedVariant || root.activeFocus ? 1 : 0
+        border.color: root.activeFocus ? Theme.primary : Theme.outline
 
         Behavior on color {
             ColorAnimation {

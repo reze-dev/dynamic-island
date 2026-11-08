@@ -76,10 +76,14 @@ QtObject {
     readonly property color backgroundInk: Qt.rgba(0.890, 0.890, 0.890)
     readonly property alias onBackground: theme.backgroundInk
     readonly property color surface: Qt.rgba(0.067, 0.075, 0.082)
-    readonly property color surfaceInk: Qt.rgba(0.890, 0.890, 0.890)
+    readonly property color surfaceInk: highContrast
+        ? Qt.rgba(1.0, 1.0, 1.0)
+        : Qt.rgba(0.890, 0.890, 0.890)
     readonly property alias onSurface: theme.surfaceInk
     /// The quieter foreground, for the supporting lines and the labels.
-    readonly property color surfaceVariant: Qt.rgba(0.604, 0.627, 0.647)
+    readonly property color surfaceVariant: highContrast
+        ? Qt.rgba(0.84, 0.86, 0.88)
+        : Qt.rgba(0.604, 0.627, 0.647)
     readonly property alias onSurfaceVariant: theme.surfaceVariant
     readonly property color surfaceDim: Qt.rgba(0, 0, 0)
     readonly property color surfaceBright: Qt.rgba(0.204, 0.224, 0.243)
@@ -102,8 +106,12 @@ QtObject {
 
     // ---- colour roles: outlines and fills ----
 
-    readonly property color outline: Qt.rgba(0.447, 0.471, 0.502)
-    readonly property color outlineVariant: Qt.rgba(0.251, 0.278, 0.302)
+    readonly property color outline: highContrast
+        ? Qt.rgba(0.85, 0.87, 0.90)
+        : Qt.rgba(0.447, 0.471, 0.502)
+    readonly property color outlineVariant: highContrast
+        ? Qt.rgba(0.65, 0.68, 0.72)
+        : Qt.rgba(0.251, 0.278, 0.302)
 
     /// The hairline that edges the expanded panel.
     readonly property color hairline: Qt.rgba(1, 1, 1, 0.102)
