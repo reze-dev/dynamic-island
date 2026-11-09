@@ -12,8 +12,10 @@
 - Live, no host pauses (daemon + UI up throughout, Waybar running):
   `swaymsg` overlay `('overlay','quickshell')`; `tray.list` owner
   `"other"` (Waybar steady state, no claim env, no fake items);
-  `notifications.send` + `view.set 2` renders two rich notifications
-  with bodies ("Steady state", "Final matrix", 2 new).
+  `notifications.send` + `view.set 2` renders four rich notifications
+  with bodies ("Final acceptance — steady state…", "Final
+  acceptance — Sway + Nix-QuickShell scope…", "Steady state", "Final
+  matrix", 4 new).
 - `just install-units` writes `~/.config/systemd/user/isled.service` and
   `quickshell.service` with store paths baked in, and `just start` runs
   them under systemd user. Both services report `active (running)` and
