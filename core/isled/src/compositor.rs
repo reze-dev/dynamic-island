@@ -79,8 +79,10 @@ impl Adapter {
 
 // ---------------------------------------------------------------- niri
 
-/// Niri queries are best-effort shell-outs to `niri msg`. The socket path
-/// is discoverable via `$NIRI_SOCKET`; the event stream is structured JSON.
+/// Niri queries are best-effort shell-outs to `niri msg -j`. The socket
+/// path is discoverable via `$NIRI_SOCKET`; the event stream is
+/// newline-delimited JSON, requested with `{"EventStream":null}` (niri
+/// replies `{"Ok":"Handled"}` and then streams full state + deltas).
 #[derive(Debug, Clone, Default)]
 #[allow(dead_code)]
 pub struct NiriAdapter {
@@ -112,40 +114,62 @@ impl NiriAdapter {
     )> {
         let stream = UnixStream::connect(&self.socket).await?;
         let (read, mut write) = stream.into_split();
-        write.write_all(b"{\"EventStream\":[]}\n").await?;
+        write.write_all(b"{\"EventStream\":null}\n").await?;
         write.flush().await?;
         Ok((BufReader::new(read), write))
     }
-}
 
-pub fn parse_niri_line(line: &str) -> Option<CompositorEvent> {
-    let trimmed = line.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    let value: serde_json::Value = serde_json::from_str(trimmed).ok()?;
-    let obj = value.as_object()?;
-    if let Some(focused) = obj.get("focusedWindow") {
-        if let Some(window) = parse_niri_window(focused) {
-            return Some(CompositorEvent::FocusChanged {
-                window: Some(window),
-            });
+    /// One `niri msg -j <cmd>` invocation, parsed as JSON.
+    fn niri_msg(&self, cmd: &str) -> Option<serde_json::Value> {
+        let output = std::process::Command::new("niri")
+            .arg("msg")
+            .arg("-j")
+            .arg(cmd)
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
         }
+        serde_json::from_slice(&output.stdout).ok()
     }
-    if obj.contains_key("WorkspacesChanged") || obj.contains_key("OutputsChanged") {
-        return Some(CompositorEvent::Other {
-            raw: trimmed.to_string(),
-        });
+
+    fn query_focused(&self) -> Option<FocusedWindow> {
+        let value = self.niri_msg("focused-window")?;
+        if value.is_null() {
+            return None;
+        }
+        parse_niri_window(&value)
     }
-    None
+
+    fn query_workspaces(&self) -> Vec<Workspace> {
+        let Some(value) = self.niri_msg("workspaces") else {
+            return Vec::new();
+        };
+        let Some(array) = value.as_array() else {
+            return Vec::new();
+        };
+        array.iter().map(parse_niri_workspace).collect()
+    }
+
+    fn query_outputs(&self) -> Vec<Output> {
+        let Some(value) = self.niri_msg("outputs") else {
+            return Vec::new();
+        };
+        let Some(object) = value.as_object() else {
+            return Vec::new();
+        };
+        object.values().map(parse_niri_output).collect()
+    }
 }
 
-fn parse_niri_window(value: &serde_json::Value) -> Option<FocusedWindow> {
-    let window = value.get("window")?;
-    let object = window.get("window")?;
+/// Parse one `niri msg -j` / EventStream window object:
+/// `{"id":4,"title":"...","app_id":"helium","workspace_id":1,...}`.
+/// `workspace_id` is a number; `fullscreen` is always false (niri's Window
+/// carries no fullscreen flag).
+pub fn parse_niri_window(value: &serde_json::Value) -> Option<FocusedWindow> {
+    let object = value.as_object()?;
     let app_id = object
         .get("app_id")
-        .or_else(|| object.get("appId"))
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .into();
@@ -154,33 +178,187 @@ fn parse_niri_window(value: &serde_json::Value) -> Option<FocusedWindow> {
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .into();
-    let workspace = object
-        .get("workspace_id")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .into();
-    let fullscreen = object
-        .get("is_focused")
-        .or_else(|| object.get("fullscreen"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let workspace = match object.get("workspace_id") {
+        Some(serde_json::Value::String(s)) => s.clone(),
+        Some(serde_json::Value::Number(n)) => n.to_string(),
+        _ => String::new(),
+    };
     Some(FocusedWindow {
         app_id,
         title,
         workspace,
-        fullscreen,
+        fullscreen: false,
     })
+}
+
+/// Parse one `niri msg -j workspaces` entry:
+/// `{"id":1,"idx":1,"name":null,"output":"eDP-1","is_focused":true,...}`.
+pub fn parse_niri_workspace(value: &serde_json::Value) -> Workspace {
+    let object = value.as_object();
+    let idx = object.and_then(|o| o.get("idx")).and_then(|v| v.as_u64());
+    let name = object
+        .and_then(|o| o.get("name"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| idx.map(|i| i.to_string()).unwrap_or_default());
+    Workspace {
+        name,
+        focused: object
+            .and_then(|o| o.get("is_focused"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        output: object
+            .and_then(|o| o.get("output"))
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+    }
+}
+
+/// Parse one `niri msg -j outputs` entry. `refresh_hz` keeps niri's raw
+/// `refresh_rate` (mHz) to match the Sway adapter's convention.
+pub fn parse_niri_output(value: &serde_json::Value) -> Output {
+    let object = value.as_object();
+    let name = object
+        .and_then(|o| o.get("name"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .into();
+    let logical = object
+        .and_then(|o| o.get("logical"))
+        .and_then(|v| v.as_object());
+    let current = object
+        .and_then(|o| o.get("current_mode"))
+        .and_then(|v| v.as_u64());
+    let refresh_hz = object
+        .and_then(|o| o.get("modes"))
+        .and_then(|v| v.as_array())
+        .and_then(|modes| {
+            let index = current.unwrap_or(0) as usize;
+            modes.get(index).or_else(|| modes.first())
+        })
+        .and_then(|m| m.get("refresh_rate"))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u32;
+    Output {
+        name,
+        scale: logical
+            .and_then(|l| l.get("scale"))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(1.0),
+        width: logical
+            .and_then(|l| l.get("width"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u32,
+        height: logical
+            .and_then(|l| l.get("height"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u32,
+        refresh_hz,
+        active: true,
+    }
+}
+
+/// The focused window inside a `WindowsChanged` payload, if any window is
+/// focused.
+fn focused_in_windows(payload: &serde_json::Value) -> Option<FocusedWindow> {
+    let windows = payload.get("windows")?.as_array()?;
+    windows
+        .iter()
+        .find(|w| {
+            w.get("is_focused")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+        })
+        .and_then(parse_niri_window)
+}
+
+/// Parse one line of the niri EventStream. State-carrying variants
+/// (`WindowsChanged`, `WorkspacesChanged`, `OutputsChanged`,
+/// `WindowOpenedOrChanged`) are translated directly. Id-only deltas
+/// (`WindowFocusChanged`, `WorkspaceFocusChanged`, `WindowClosed`,
+/// `WorkspaceClosed`, `WorkspaceOpenedOrChanged`) carry no window or
+/// workspace fields, so this returns `Other` for them and the adapter's
+/// `parse_line` re-queries instead.
+pub fn parse_niri_line(line: &str) -> Option<CompositorEvent> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let value: serde_json::Value = serde_json::from_str(trimmed).ok()?;
+    let obj = value.as_object()?;
+    if let Some(windows) = obj.get("WindowsChanged") {
+        return Some(CompositorEvent::FocusChanged {
+            window: focused_in_windows(windows),
+        });
+    }
+    if let Some(workspaces) = obj.get("WorkspacesChanged") {
+        let list = workspaces
+            .get("workspaces")
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().map(parse_niri_workspace).collect())
+            .unwrap_or_default();
+        return Some(CompositorEvent::WorkspaceChanged { workspaces: list });
+    }
+    if let Some(outputs) = obj.get("OutputsChanged") {
+        let list = outputs
+            .get("outputs")
+            .and_then(|v| v.as_object())
+            .map(|o| o.values().map(parse_niri_output).collect())
+            .unwrap_or_default();
+        return Some(CompositorEvent::OutputsChanged { outputs: list });
+    }
+    if let Some(opened) = obj.get("WindowOpenedOrChanged") {
+        if let Some(window) = opened.get("window").and_then(parse_niri_window) {
+            return Some(CompositorEvent::WindowSongChanged {
+                window: Some(window),
+            });
+        }
+    }
+    if obj.contains_key("WindowFocusChanged")
+        || obj.contains_key("WorkspaceFocusChanged")
+        || obj.contains_key("WindowClosed")
+        || obj.contains_key("WorkspaceClosed")
+        || obj.contains_key("WorkspaceOpenedOrChanged")
+    {
+        return Some(CompositorEvent::Other {
+            raw: trimmed.to_string(),
+        });
+    }
+    None
 }
 
 impl CompositorAdapter for NiriAdapter {
     fn query(&self) -> CompositorInfo {
-        // Best-effort: `niri msg workspaces` / `niri msg outputs` are not
-        // stable JSON on every version, so decode defensively.
-        CompositorInfo::default()
+        CompositorInfo {
+            focused_window: self.query_focused(),
+            workspaces: self.query_workspaces(),
+            outputs: self.query_outputs(),
+        }
     }
 
     fn parse_line(&self, line: &str) -> Option<CompositorEvent> {
-        parse_niri_line(line)
+        match parse_niri_line(line) {
+            Some(CompositorEvent::Other { raw })
+                if raw.contains("WindowFocusChanged")
+                    || raw.contains("WorkspaceFocusChanged")
+                    || raw.contains("WindowClosed")
+                    || raw.contains("WorkspaceClosed")
+                    || raw.contains("WorkspaceOpenedOrChanged") =>
+            {
+                // Id-only deltas: refresh the affected slice from niri.
+                if raw.contains("Workspace") {
+                    Some(CompositorEvent::WorkspaceChanged {
+                        workspaces: self.query_workspaces(),
+                    })
+                } else {
+                    Some(CompositorEvent::FocusChanged {
+                        window: self.query_focused(),
+                    })
+                }
+            }
+            other => other,
+        }
     }
 }
 
@@ -603,20 +781,66 @@ mod tests {
 
     #[test]
     fn niri_focus_changes_are_parsed() {
-        let line = r#"{"focusedWindow":{"window":{"window":{"app_id":"kitty","title":"zsh","workspace_id":"1","is_focused":true}}}}"#;
+        // Verbatim shape from a live `niri msg event-stream` (niri 26.04).
+        let line = r#"{"WindowsChanged":{"windows":[{"id":4,"title":"Configure Nexus TLS for OpenShift - Helium","app_id":"helium","pid":13659,"workspace_id":1,"is_focused":true,"is_floating":false,"is_urgent":false,"layout":{"pos_in_scrolling_layout":[1,1],"tile_size":[1560.0,900.0],"window_size":[1560,900],"tile_pos_in_workspace_view":null,"window_offset_in_tile":[0.0,0.0]},"focus_timestamp":{"secs":8095,"nanos":849763916}}]}}"#;
         match parse_niri_line(line) {
             Some(CompositorEvent::FocusChanged { window: Some(w) }) => {
-                assert_eq!(w.app_id, "kitty");
-                assert_eq!(w.title, "zsh");
+                assert_eq!(w.app_id, "helium");
+                assert_eq!(w.title, "Configure Nexus TLS for OpenShift - Helium");
+                assert_eq!(w.workspace, "1");
+                assert!(!w.fullscreen);
             }
             other => panic!("unexpected: {other:?}"),
         }
     }
 
     #[test]
+    fn niri_workspaces_are_parsed() {
+        let line = r#"{"WorkspacesChanged":{"workspaces":[{"id":1,"idx":1,"name":null,"output":"eDP-1","is_urgent":false,"is_active":true,"is_focused":true,"active_window_id":4}]}}"#;
+        match parse_niri_line(line) {
+            Some(CompositorEvent::WorkspaceChanged { workspaces }) => {
+                assert_eq!(workspaces.len(), 1);
+                assert_eq!(workspaces[0].name, "1");
+                assert!(workspaces[0].focused);
+                assert_eq!(workspaces[0].output.as_deref(), Some("eDP-1"));
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn niri_outputs_are_parsed() {
+        let line = r#"{"OutputsChanged":{"outputs":{"eDP-1":{"name":"eDP-1","physical_size":[340,190],"modes":[{"width":1920,"height":1080,"refresh_rate":144000,"is_preferred":true}],"current_mode":0,"logical":{"x":0,"y":0,"width":1600,"height":900,"scale":1.2,"transform":"Normal"}}}}}"#;
+        match parse_niri_line(line) {
+            Some(CompositorEvent::OutputsChanged { outputs }) => {
+                assert_eq!(outputs.len(), 1);
+                assert_eq!(outputs[0].name, "eDP-1");
+                assert_eq!(outputs[0].width, 1600);
+                assert_eq!(outputs[0].height, 900);
+                assert!((outputs[0].scale - 1.2).abs() < 0.01);
+                assert_eq!(outputs[0].refresh_hz, 144000);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn niri_id_only_deltas_are_other_so_the_adapter_re_queries() {
+        assert!(matches!(
+            parse_niri_line(r#"{"WindowFocusChanged":{"id":4,"previous":11}}"#),
+            Some(CompositorEvent::Other { .. })
+        ));
+        assert!(matches!(
+            parse_niri_line(r#"{"WorkspaceFocusChanged":{"id":1,"previous":null}}"#),
+            Some(CompositorEvent::Other { .. })
+        ));
+    }
+
+    #[test]
     fn niri_garbage_is_ignored() {
         assert!(parse_niri_line("not json").is_none());
         assert!(parse_niri_line("   ").is_none());
+        assert!(parse_niri_line(r#"{"Ok":"Handled"}"#).is_none());
     }
 
     #[test]

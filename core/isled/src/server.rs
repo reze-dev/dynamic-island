@@ -315,7 +315,7 @@ impl Server {
     async fn niri_stream(&self, socket: std::path::PathBuf) -> std::io::Result<()> {
         let stream = tokio::net::UnixStream::connect(&socket).await?;
         let (read, mut write) = stream.into_split();
-        write.write_all(b"{\"EventStream\":[]}\n").await?;
+        write.write_all(b"{\"EventStream\":null}\n").await?;
         write.flush().await?;
         let mut lines = tokio::io::BufReader::new(read).lines();
         while let Some(line) = lines.next_line().await? {
@@ -2449,7 +2449,6 @@ pub fn snapshot() -> Snapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::io::AsyncReadExt;
     use tokio::time::{Duration, timeout};
 
     fn scratch(name: &str) -> PathBuf {
@@ -2645,19 +2644,30 @@ mod tests {
         });
         wait_for_socket(&path).await;
 
-        let mut client = UnixStream::connect(&path).await.unwrap();
+        let client = UnixStream::connect(&path).await.unwrap();
+        let mut client = BufReader::new(client);
 
-        let mut buf = vec![0u8; 8192];
-        let read = client.read(&mut buf).await.unwrap();
-        let state: ServerMessage = serde_json::from_str(str_of(&buf, read).trim()).unwrap();
+        let mut line = String::new();
+        client.read_line(&mut line).await.unwrap();
+        let state: ServerMessage = serde_json::from_str(line.trim()).unwrap();
         assert!(matches!(state, ServerMessage::State { .. }));
 
         client
+            .get_mut()
             .write_all(b"{\"t\":\"cmd\",\"id\":4,\"name\":\"ping\"}\n")
             .await
             .unwrap();
-        let read = client.read(&mut buf).await.unwrap();
-        let reply: ServerMessage = serde_json::from_str(str_of(&buf, read).trim()).unwrap();
+        // Ambient events (e.g. `clipboard.changed` from the watcher priming
+        // with the host clipboard) can arrive alongside the reply, so read
+        // line-by-line and take the reply with our id.
+        let reply = loop {
+            line.clear();
+            client.read_line(&mut line).await.unwrap();
+            let msg: ServerMessage = serde_json::from_str(line.trim()).unwrap();
+            if matches!(msg, ServerMessage::Reply { id: 4, .. }) {
+                break msg;
+            }
+        };
         assert_eq!(reply, ServerMessage::reply_ok(4));
 
         drop(client);
@@ -2731,18 +2741,28 @@ mod tests {
             ServerMessage::State { .. }
         ));
 
-        line.clear();
-        let tick = timeout(TICK_INTERVAL * 3, reader.read_line(&mut line))
-            .await
-            .expect("a tick should arrive without the client asking")
-            .unwrap();
-        assert_eq!(tick, line.len(), "expected a full line");
+        // The first post-snapshot event need not be `system.stats`: the
+        // clipboard watcher primes with the host clipboard on startup, so a
+        // `clipboard.changed` can beat the tick. Skip anything else and
+        // wait for the tick itself.
+        let tick = loop {
+            line.clear();
+            let n = timeout(TICK_INTERVAL * 3, reader.read_line(&mut line))
+                .await
+                .expect("a tick should arrive without the client asking")
+                .unwrap();
+            assert_eq!(n, line.len(), "expected a full line");
+            let msg: ServerMessage = serde_json::from_str(line.trim()).unwrap();
+            if matches!(&msg, ServerMessage::Event { topic, .. } if topic == "system.stats") {
+                break msg;
+            }
+        };
         assert!(
             matches!(
-                serde_json::from_str::<ServerMessage>(line.trim()).unwrap(),
+                tick,
                 ServerMessage::Event { ref topic, .. } if topic == "system.stats"
             ),
-            "got: {line}"
+            "got: {tick:?}"
         );
 
         server.trigger_shutdown();
@@ -2889,9 +2909,5 @@ mod tests {
         })
         .await
         .expect("socket should appear");
-    }
-
-    fn str_of(buf: &[u8], len: usize) -> String {
-        String::from_utf8_lossy(&buf[..len]).into_owned()
     }
 }
