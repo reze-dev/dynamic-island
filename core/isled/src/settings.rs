@@ -44,6 +44,15 @@ pub struct Settings {
     /// High-contrast mode: boosts text contrast.
     #[serde(default)]
     pub high_contrast: bool,
+    /// Wallhaven search tier: "sfw" (default), "sketchy" or "nsfw". The
+    /// sketchy/nsfw tiers need `wallhaven_api_key` and are refused
+    /// without one.
+    #[serde(default = "default_purity")]
+    pub wallhaven_purity: String,
+    /// Optional Wallhaven API key. Stored in the local settings file;
+    /// sent only to wallhaven.cc. Blank keeps searches SFW-only.
+    #[serde(default)]
+    pub wallhaven_api_key: String,
 }
 
 fn default_cache_max_bytes() -> u64 {
@@ -66,6 +75,10 @@ fn default_true() -> bool {
     true
 }
 
+fn default_purity() -> String {
+    "sfw".to_string()
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -81,6 +94,8 @@ impl Default for Settings {
             morph_duration_ms: default_morph_ms(),
             reduced_motion: false,
             high_contrast: false,
+            wallhaven_purity: default_purity(),
+            wallhaven_api_key: String::new(),
         }
     }
 }
@@ -134,6 +149,23 @@ mod tests {
         assert!(settings.wallpaper_dir.contains("Wallpapers"));
         assert!(settings.notes_dir.contains("isle-notes"));
         assert!(settings.calendar_dir.contains("calendars"));
+    }
+
+    #[test]
+    fn wallhaven_defaults_are_sfw_only() {
+        let settings = Settings::default();
+        assert_eq!(settings.wallhaven_purity, "sfw");
+        assert!(settings.wallhaven_api_key.is_empty());
+    }
+
+    #[test]
+    fn older_settings_files_without_wallhaven_keys_still_load() {
+        // A settings.json written before the wallhaven keys existed must
+        // deserialize with the SFW defaults, not fail.
+        let json = r#"{"wallpaper_dir":"/w","notes_dir":"/n","calendar_dir":"/c"}"#;
+        let settings: Settings = serde_json::from_str(json).unwrap();
+        assert_eq!(settings.wallhaven_purity, "sfw");
+        assert!(settings.wallhaven_api_key.is_empty());
     }
 
     #[test]

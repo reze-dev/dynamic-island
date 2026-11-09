@@ -171,7 +171,9 @@ can draw.
 curl 'https://wallhaven.cc/api/v1/search?categories=100&purity=100&sorting=toplist&atleast=1920x1080&page=1'
 ```
 
-- No API key for SFW. Always `purity=100`.
+- No API key for SFW. Default `purity=100` (SFW). Sketchy (`110`) / NSFW (`111`)
+  are opt-ins in the Wallhaven tab and need a key from `wallhaven.cc/settings`
+  (stored in settings; refused without one).
 - Rate limit **45 req/min**. Debounce ≥350 ms, never poll, cache.
 - **`colors[]` is a ready-made palette *before downloading anything*** — the
   theme switcher can preview a wallpaper's theme with zero image decode.
@@ -249,6 +251,14 @@ fields, so the adapter re-queries via `niri msg -j focused-window|workspaces|out
    and the build fails with "file not found for module". `just release` uses
    `path:` on purpose so it builds what is on disk; `just release-committed`
    is the reproducible one.
+8. **`tokio::Mutex` is not reentrant.** A dispatch arm that locks `domain`
+   and then awaits a helper that re-locks the same mutex self-deadlocks,
+   silently: the connection never replies, every later snapshot lands on the
+   same lock, and the daemon wedges with no log line (CPU ~0). That is what
+   happened when `wallpaper.search` learned to read tier/key from settings
+   and `wallpaper_search`'s cache prune re-locked `domain` underneath it —
+   the first real search wedged the daemon until restart. The fix is to
+   clone the values, drop the guard, *then* await.
 
 ### 4.9 Quickshell constraints, found the hard way
 

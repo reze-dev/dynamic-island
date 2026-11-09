@@ -24,6 +24,16 @@ Item {
     property bool whLoading: false
     property string whError: ""
     property string whQuery: ""
+    /// The Wallhaven tier: "sfw" (default), "sketchy" or "nsfw". Sketchy
+    /// and NSFW need an API key (wallhaven.cc/settings); the daemon
+    /// refuses them without one, so the chips persist the tier and the
+    /// search sends it.
+    property string whPurity: "sfw"
+
+    Component.onCompleted: {
+        if (panel.bridge && panel.bridge.settings && panel.bridge.settings.wallhaven_purity)
+            panel.whPurity = panel.bridge.settings.wallhaven_purity;
+    }
     // The handoff tab: the daemon watches ~/Downloads and imports saves.
     property string handoffDir: ""
     property int handoffPending: 0
@@ -42,7 +52,7 @@ Item {
         panel.whError = "";
         panel.bridge.call(
             "wallpaper.search",
-            { "q": panel.whQuery, "page": panel.whPage },
+            { "q": panel.whQuery, "page": panel.whPage, "purity": panel.whPurity },
             function (ok, payload, error) {
                 panel.whLoading = false;
                 if (ok && payload) {
@@ -396,12 +406,101 @@ Item {
         }
     }
 
+    // The Wallhaven tier row: the purity chips plus the API key field.
+    // Visible only in the Wallhaven tab; the scroller's top follows it so
+    // the other tabs do not inherit its height.
+    Row {
+        id: tierRow
+        anchors.top: tabs.bottom
+        anchors.topMargin: Theme.spacingTight
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: Theme.spacing
+        anchors.rightMargin: Theme.spacing
+        height: 28
+        visible: panel.tab === "wallhaven"
+        spacing: Theme.spacingTight
+
+        Repeater {
+            model: [
+                { "name": "sfw", "label": "SFW" },
+                { "name": "sketchy", "label": "Sketchy" },
+                { "name": "nsfw", "label": "NSFW" }
+            ]
+            Item {
+                required property var modelData
+                width: 72
+                height: 28
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.radiusSmall
+                    color: panel.whPurity === modelData.name ? Theme.primaryDim : Theme.surfaceFillLow
+                    border.width: 1
+                    border.color: panel.whPurity === modelData.name ? Theme.primary : Theme.outlineVariant
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: modelData.label
+                        color: panel.whPurity === modelData.name ? Theme.primary : Theme.onSurfaceVariant
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.type.labelSmall.size
+                        font.weight: Theme.type.labelSmall.weight
+                        font.letterSpacing: Theme.type.labelSmall.tracking
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        panel.whPurity = modelData.name;
+                        if (panel.bridge)
+                            panel.bridge.callAndSay(
+                                "settings.set",
+                                { "key": "wallhaven_purity", "value": modelData.name },
+                                "Wallhaven: " + modelData.label,
+                                "Could not save the tier");
+                        panel.whPage = 1;
+                        panel.whSearch();
+                    }
+                }
+            }
+        }
+
+        Item {
+            width: tabs.width - 72 * 3 - Theme.spacingTight * 3
+            height: 28
+
+            TextField {
+                id: whKeyField
+                anchors.fill: parent
+                placeholder: "Wallhaven API key (blank = SFW-only)"
+                text: ""
+                onAccepted: {
+                    if (panel.bridge && text.trim() !== "") {
+                        panel.bridge.callAndSay(
+                            "settings.set",
+                            { "key": "wallhaven_api_key", "value": text.trim() },
+                            "Wallhaven API key saved",
+                            "Could not save the key");
+                        text = "";
+                    }
+                    panel.whSearch();
+                }
+                onEscapePressed: {
+                    if (text !== "") text = "";
+                }
+            }
+        }
+    }
+
     // The grid. It has to scroll: a directory of wallpapers is usually bigger
     // than the panel, and a grid that only shows the first eight is a grid
     // with a wall of nothing at the bottom.
     Flickable {
         id: scroller
-        anchors.top: tabs.bottom
+        anchors.top: panel.tab === "wallhaven" ? tierRow.bottom : tabs.bottom
         anchors.topMargin: Theme.spacing
         anchors.left: parent.left
         anchors.right: parent.right

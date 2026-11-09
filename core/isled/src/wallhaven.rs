@@ -19,6 +19,43 @@ pub const REQUEST_TIMEOUT_SECS: u64 = 15;
 /// Hosts a Wallhaven fetch may reach. Anything else is rejected.
 const ALLOWED_HOSTS: &[&str] = &["wallhaven.cc", "w.wallhaven.cc", "th.wallhaven.cc"];
 
+/// Map a tier name to the API's `purity` bits: SFW is `100`, plus-sketchy
+/// is `110`, everything is `111`. Unknown names are invalid.
+pub fn purity_bits(tier: &str) -> Option<&'static str> {
+    match tier {
+        "sfw" => Some("100"),
+        "sketchy" => Some("110"),
+        "nsfw" => Some("111"),
+        _ => None,
+    }
+}
+
+/// Build a `/search` URL. The API key is appended only when present:
+/// unauthenticated requests work for SFW and are refused (403) otherwise.
+pub fn build_search_url(
+    query: &str,
+    page: u32,
+    purity: &str,
+    api_key: &str,
+) -> Result<url::Url, String> {
+    let mut url = url::Url::parse(&format!("{API_BASE}/search")).map_err(|e| format!("{e}"))?;
+    {
+        let mut pairs = url.query_pairs_mut();
+        if !query.trim().is_empty() {
+            pairs.append_pair("q", query.trim());
+        }
+        pairs.append_pair("categories", "100");
+        pairs.append_pair("purity", purity);
+        pairs.append_pair("sorting", "toplist");
+        pairs.append_pair("atleast", "1920x1080");
+        pairs.append_pair("page", &page.to_string());
+        if !api_key.trim().is_empty() {
+            pairs.append_pair("apikey", api_key.trim());
+        }
+    }
+    Ok(url)
+}
+
 /// Reject URLs that do not match the Wallhaven allowlist.
 pub fn bounded_url(raw: &str) -> Result<url::Url, String> {
     let parsed = url::Url::parse(raw).map_err(|e| format!("bad url: {e}"))?;
@@ -182,20 +219,17 @@ impl WallhavenClient {
         Self { client }
     }
 
-    /// Search. `purity=100` unconditionally (SFW only, PLAN §4.9).
-    pub async fn search(&self, query: &str, page: u32) -> Result<SearchPage, String> {
-        let mut url = url::Url::parse(&format!("{API_BASE}/search")).map_err(|e| format!("{e}"))?;
-        {
-            let mut pairs = url.query_pairs_mut();
-            if !query.trim().is_empty() {
-                pairs.append_pair("q", query.trim());
-            }
-            pairs.append_pair("categories", "100");
-            pairs.append_pair("purity", "100");
-            pairs.append_pair("sorting", "toplist");
-            pairs.append_pair("atleast", "1920x1080");
-            pairs.append_pair("page", &page.to_string());
-        }
+    /// Search at a purity tier (`purity_bits` output) with an optional key.
+    /// SFW needs no key; sketchy/nsfw need one (the server refuses them
+    /// without one before this lands here).
+    pub async fn search(
+        &self,
+        query: &str,
+        page: u32,
+        purity: &str,
+        api_key: &str,
+    ) -> Result<SearchPage, String> {
+        let url = build_search_url(query, page, purity, api_key)?;
         let resp = self
             .client
             .get(url)
@@ -307,6 +341,36 @@ mod tests {
     fn a_video_is_not_renderable() {
         assert!(!is_renderable_mime("video/mp4"));
         assert!(is_renderable_mime("image/jpeg"));
+    }
+
+    #[test]
+    fn purity_tiers_map_to_bits() {
+        assert_eq!(purity_bits("sfw"), Some("100"));
+        assert_eq!(purity_bits("sketchy"), Some("110"));
+        assert_eq!(purity_bits("nsfw"), Some("111"));
+        assert_eq!(purity_bits("everything"), None);
+        assert_eq!(purity_bits(""), None);
+    }
+
+    #[test]
+    fn search_urls_carry_tier_and_key() {
+        let sfw = build_search_url("", 1, "100", "").unwrap();
+        assert!(sfw.query_pairs().any(|(k, v)| k == "purity" && v == "100"));
+        assert!(!sfw.query_pairs().any(|(k, _)| k == "apikey"));
+
+        let keyed = build_search_url("storm", 2, "111", "my-key").unwrap();
+        assert!(keyed.query_pairs().any(|(k, v)| k == "q" && v == "storm"));
+        assert!(
+            keyed
+                .query_pairs()
+                .any(|(k, v)| k == "purity" && v == "111")
+        );
+        assert!(
+            keyed
+                .query_pairs()
+                .any(|(k, v)| k == "apikey" && v == "my-key")
+        );
+        assert!(keyed.query_pairs().any(|(k, v)| k == "page" && v == "2"));
     }
 
     #[test]

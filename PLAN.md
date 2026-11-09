@@ -430,7 +430,8 @@ turnable into an arbitrary downloader.
 ### 4.3 Wallhaven (verified against the live API)
 
 Base `https://wallhaven.cc/api/v1`. **No API key required for SFW** — a key is
-only needed for NSFW sections, which we will not implement.
+only needed for the sketchy/nsfw tiers, which are explicit opt-ins (key
+stored locally, refused without one). SFW is the default.
 
 ```
 GET /search?categories=100&purity=100&sorting=toplist&atleast=1920x1080&page=1
@@ -626,7 +627,7 @@ One `theme` panel (the mock's keybind), three tabs: **Local** · **Wallhaven** �
   debounce + cache + zero polling.
 - **MoeWalls and other no-API sites**: browse/handoff only. No automated
   downloads of any kind, including via a scraper.
-- **No NSFW paths.** `purity=100` unconditionally.
+- **NSFW paths**: explicit opt-in only, key-gated; SFW is the default everywhere (see `SOURCES.md`).
 - **Attribution retained** and displayed: artist + source page.
 - Write this policy down in `SOURCES.md` next to the code, so the constraint
   is visible to future maintainers rather than living in someone's head.

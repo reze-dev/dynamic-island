@@ -1816,7 +1816,27 @@ impl Server {
                     .get("page")
                     .and_then(serde_json::Value::as_u64)
                     .unwrap_or(1) as u32;
-                self.wallpaper_search(id, &query, page.max(1)).await
+                // Clone what the search needs, then let the lock drop
+                // before awaiting anything. `wallpaper_search` re-locks
+                // `domain` for its cache prune; a tokio Mutex is not
+                // reentrant, so holding it across this await deadlocks.
+                let (tier, api_key) = {
+                    let domain = self.domain.lock().await;
+                    (
+                        args.get("purity")
+                            .and_then(serde_json::Value::as_str)
+                            .map(str::to_string)
+                            .unwrap_or_else(|| domain.settings.wallhaven_purity.clone()),
+                        domain.settings.wallhaven_api_key.clone(),
+                    )
+                };
+                match resolve_tier(&tier, &api_key) {
+                    Ok(bits) => {
+                        self.wallpaper_search(id, &query, page.max(1), bits, &api_key)
+                            .await
+                    }
+                    Err(err) => ServerMessage::reply_err(id, err),
+                }
             }
             "wallpaper.download" => {
                 let url = arg_string(args.get("url"), "");
@@ -2062,8 +2082,17 @@ impl Server {
         ServerMessage::reply_ok(id)
     }
 
-    async fn wallpaper_search(&self, id: u64, query: &str, page: u32) -> ServerMessage {
-        let key = format!("{}::{}", query.trim().to_lowercase(), page);
+    async fn wallpaper_search(
+        &self,
+        id: u64,
+        query: &str,
+        page: u32,
+        purity: &str,
+        api_key: &str,
+    ) -> ServerMessage {
+        // The cache key names the tier but never the key: repeat visits
+        // are free, and secrets stay out of the cache.
+        let key = format!("{}::{}::{}", purity, query.trim().to_lowercase(), page);
         // Serve fresh-enough cache hits so repeats are free and the 45
         // req/min budget is never a concern.
         {
@@ -2092,7 +2121,7 @@ impl Server {
             *last = Some(std::time::Instant::now());
         }
         let client = crate::wallhaven::WallhavenClient::new();
-        match client.search(query, page).await {
+        match client.search(query, page, purity, api_key).await {
             Ok(mut result) => {
                 // Download thumbnails server-side so the panel can paint them
                 // from disk; Quickshell's QML cannot load remote images.
@@ -2300,8 +2329,37 @@ fn apply_setting(settings: &mut Settings, key: &str, value: &serde_json::Value) 
                 settings.calendar_dir = dir.to_string();
             }
         }
+        "wallhaven_purity" => {
+            if let Some(tier) = value.as_str() {
+                settings.wallhaven_purity = tier.to_string();
+            }
+        }
+        "wallhaven_api_key" => {
+            if let Some(key) = value.as_str() {
+                settings.wallhaven_api_key = key.to_string();
+            }
+        }
         _ => {}
     }
+}
+
+/// Resolve a search tier name to API purity bits, enforcing the key rule:
+/// sketchy/nsfw results need an API key (wallhaven.cc/settings) and are
+/// refused here without one, so a keyless user can never stumble into
+/// unfiltered results.
+fn resolve_tier(tier: &str, api_key: &str) -> Result<&'static str, String> {
+    let bits = crate::wallhaven::purity_bits(tier).ok_or_else(|| {
+        "wallhaven tier must be sfw, sketchy or nsfw — see the theme panel".to_string()
+    })?;
+    if bits != "100" && api_key.trim().is_empty() {
+        return Err(
+            "Wallhaven needs an API key for sketchy/nsfw results (wallhaven.cc/settings). \
+             Add one in the theme panel — it is stored in your local settings only. \
+             Without a key this browser stays SFW."
+                .to_string(),
+        );
+    }
+    Ok(bits)
 }
 
 fn parse_kind(value: &str) -> Option<ActivityKind> {
@@ -2507,6 +2565,38 @@ mod tests {
         )
         .await;
         assert!(matches!(refused, ServerMessage::Reply { ok: false, .. }));
+    }
+
+    #[test]
+    fn tiers_resolve_to_bits_and_need_a_key_above_sfw() {
+        assert_eq!(resolve_tier("sfw", ""), Ok("100"));
+        assert_eq!(resolve_tier("sfw", "some-key"), Ok("100"));
+        assert_eq!(resolve_tier("sketchy", "some-key"), Ok("110"));
+        assert_eq!(resolve_tier("nsfw", "some-key"), Ok("111"));
+        // No key, no sketchy/nsfw: the guard refuses, with guidance.
+        assert!(resolve_tier("sketchy", "").is_err());
+        assert!(resolve_tier("nsfw", "").is_err());
+        assert!(resolve_tier("everything", "some-key").is_err());
+    }
+
+    #[tokio::test]
+    async fn wallhaven_settings_persist_the_tier_and_key() {
+        let server = server("wallhaven-settings");
+        call(
+            &server,
+            "settings.set",
+            serde_json::json!({ "key": "wallhaven_purity", "value": "sketchy" }),
+        )
+        .await;
+        call(
+            &server,
+            "settings.set",
+            serde_json::json!({ "key": "wallhaven_api_key", "value": "KEY123" }),
+        )
+        .await;
+        let domain = server.domain.lock().await;
+        assert_eq!(domain.settings.wallhaven_purity, "sketchy");
+        assert_eq!(domain.settings.wallhaven_api_key, "KEY123");
     }
 
     #[tokio::test]
