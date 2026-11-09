@@ -253,3 +253,19 @@ the `_BackgroundEffect` module + `Region.radius`).
 Tray/log activity for the last full run lives in the sections above
 (photos: tray file entries, notification entries, Isolated
 staleness shot). Final recommit state: see `git log`.
+
+## Platform scoping (formally closed)
+
+| Compositor | Live coverage here | Evidence |
+|---|---|---|
+| Sway (this host) | **Full**: overlay layer, tray ownership, notifications, context, panels | `swaymsg` + grim renders, this-session |
+| Niri 26.04 | Nesting attempted; blocked: panics `Egl(DisplayNotSupported)` even with system DRI + software GL (nested render has no EGL target under this SwayFX session) | Adapter parse/translate unit-tested (`compositor.rs`); nested attempt log `/tmp/opencode/niri-a.log` |
+| Hyprland 0.56.2 | Nesting attempted; blocked: parent advertises `xdg_wm_base` v12, Hyprland wants ≤v5 (protocol mismatch abort) | Crash report + `hyp-start` log, 2026-11-09; adapter queries unit-tested |
+| QuickShell runtime | Nix-store 0.3.x required (frozen paths baked by `just install-units`, EGL env lines). Fedora 0.2.1-git cannot load `shell.qml` (`_BackgroundEffect` absent + `Region.radius` absent from its qmltypes). | qmltypes diff in `packaging/fedora.yaml` |
+
+Verification on the *next* host: launch the compositor with a minimal
+config, then run the quickshell service against the nested socket with
+the EGL env from `~/.config/systemd/user/quickshell.service`, then
+`isled call view.set 0` and window-focus routing checks. Until then the
+audit is honest: code complete, Sway-proven, matrix-nested blocked by
+host capability.
