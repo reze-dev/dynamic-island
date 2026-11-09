@@ -5,14 +5,15 @@
 # (swayfx). The daemon and the QML are unchanged; only packaging and the
 # compositor keybinds differ.
 
-## What works here (verified 2026-11-09, re-run: final matrix)
+## What works here (verified 2026-11-09, re-run: final acceptance in steady state)
 
 - `cargo test` (183 tests), `cargo clippy`, `cargo fmt`, `just lint-qml`,
   `just preview` / `just preview-live` all pass on Fedora.
-- Live: `swaymsg` overlay `('overlay','quickshell')`; `tray.list` owner
-  `"other"` (Waybar steady state); `compositor.info` kitty/eDP-1
-  1920×1080; `wallpaper.cache` budget/prune on; `notifications.send` +
-  `view.set 2` renders the panel with body text.
+- Live, no host pauses (daemon + UI up throughout, Waybar running):
+  `swaymsg` overlay `('overlay','quickshell')`; `tray.list` owner
+  `"other"` (Waybar steady state, no claim env, no fake items);
+  `notifications.send` + `view.set 2` renders two rich notifications
+  with bodies ("Steady state", "Final matrix", 2 new).
 - `just install-units` writes `~/.config/systemd/user/isled.service` and
   `quickshell.service` with store paths baked in, and `just start` runs
   them under systemd user. Both services report `active (running)` and
