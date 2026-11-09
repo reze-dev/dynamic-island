@@ -316,6 +316,24 @@ the EGL env from `~/.config/systemd/user/quickshell.service`, then
 audit is honest: code complete, Sway-proven, matrix-nested blocked by
 host capability.
 
+## Sway focus matrix (§5.2, 2026-11-09, live)
+
+Method: open the todos panel (`view.set 5`) with kitty focused, type via
+`wtype` (dnf-downloaded, extracted, run without sudo), screenshot; then
+toggle the island closed and type again.
+
+- Expand on Sway: typed `matrix-check-1` — keystrokes landed in kitty
+  (shell prompt), island did not trap the keyboard. Top bar: `swaymsg`
+  reported kitty focused throughout.
+- Collapse (`island.toggle` + `view.set 0` for state) and type again:
+  `matrix-check-2` landed appended to the same prompt.
+
+Cell 1 of the PLAN §5.2 matrix is therefore verified live on Sway:
+expand → type → collapse → keystrokes reach the terminal again, with
+no `focusable` hijack. Cells for niri/Hyprland cannot run here —
+their adapters stay unit-tested; the compositor-nesting logs quoted
+above (EGL/protocol) are why.
+
 ## Render proofs (offscreen, mocked bridge)
 
 - Brightness tile: NetworkPanel renders the sun tile; offscreen with a
