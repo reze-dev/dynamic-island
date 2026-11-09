@@ -47,16 +47,21 @@ Item {
         clip: true
     }
 
-    // The outline path is drawn in the 24-unit Material grid, y-flipped
-    // from the font's frame. The Shape sits centred, and the scale grows
-    // about the centre, so the glyph lands in the middle of its plate
-    // instead of the top-left corner.
+    // The outline path is drawn in the 24-unit Material grid, in font
+    // coordinates: the ink sits at roughly x in [2, 22], y in [-22, -2]
+    // (baseline above the ink). Its centre is therefore (12, -12) in
+    // shape space, not (12, 12). Position the shape so that point lands
+    // on the plate's centre; centring the shape then scaling about its
+    // own centre would put the glyph a full cell above the plate.
     Shape {
-        anchors.centerIn: parent
+        readonly property real cellScale: Math.max(0.01, Math.min(root.width, root.height) / 24)
+
         width: 24
         height: 24
-        scale: Math.max(0.01, Math.min(root.width, root.height) / 24)
+        scale: cellScale
         transformOrigin: Item.Center
+        x: root.width / 2 - 12
+        y: root.height / 2 - 12 + 24 * cellScale
         visible: !Icons.available
 
         ShapePath {

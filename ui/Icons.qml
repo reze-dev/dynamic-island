@@ -20,10 +20,16 @@ import QtQuick
 // is rougher than the font is.
 QtObject {
     /// The family the icons come from. Both Material Symbols and Material
-    /// Icons families render through the same ligature table; Fedora ships
-    /// the Icons family (`material-icons-fonts`), so the default is its
-    /// Round style.
-    readonly property string family: "Material Icons Round"
+    /// Icons families render through the same ligature table. Material
+    /// Symbols (nixpkgs `material-symbols`, Michi's system font) is
+    /// preferred; Fedora ships the Icons family (`material-icons-fonts`),
+    /// so that is the fallback. Do not special-case a machine here.
+    readonly property string family: {
+        var families = Qt.fontFamilies();
+        if (families.indexOf("Material Symbols Rounded") >= 0)
+            return "Material Symbols Rounded";
+        return "Material Icons Round";
+    }
 
     /// Whether the font is installed at all.
     readonly property bool available: Qt.fontFamilies().indexOf(family) >= 0
