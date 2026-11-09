@@ -101,20 +101,21 @@ and snackbar, so mouse clicks elsewhere still reach Waybar.
 
 ## What is still missing (vs PLAN.md)
 
-| Phase | What is missing |
-|-------|-----------------|
-## What is still missing (vs PLAN.md)
+All code-declared gaps are closed; scope boundaries that remain are
+platform/environment ones (not missing features):
 
-Phase 7 closed above (brightness via `brightnessctl` + panel tile, dark/light
-scheme via `settings.theme` + Theme toggle, calendar month grid with event
-dots, matugen tie-in via `palette.rs` sampled extraction persisted to
-`palette.json` and consumed by `Theme` overrides at startup). Known remains:
-brightness is backlight-only (no DDC — intentional), matugen binary is an
-optional accelerator (sampled path is primary; binary check is a reserved
-hook), the window manager/other-config keybinds and 3-failure backoff are
-NixOS-only paths, and the QuickShell runtime remains Nix-store 0.3.x
-(Fedora 0.2.1 lacks `BackgroundEffect`/`Region.radius` — documented in
-`packaging/fedora.yaml`).
+- Brightness is backlight-only (`brightnessctl`); DDC/CI monitors are
+  out of scope by design (no `ddcutil`, no i2c perms).
+- The `matugen` binary is an optional accelerator (`matugen image`
+  hook reserved); the primary path is the sampled extractor — always
+  available, no extra dependency.
+- Niri/Helix of the two target compositors are adapter-complete and
+  unit-tested; Sway is the only live-verified compositor on this host.
+- QuickShell runtime is Nix-store 0.3.x (Fedora 0.2.1-git cannot load
+  `shell.qml`: absent `_BackgroundEffect` + `Region.radius` — evidence
+  in `packaging/fedora.yaml`). The RPM's `Requires: quickshell >= 0.3.2`
+  is therefore declarable, and the user-local tarball is the supported
+  install path on Fedora 45 today.
 
 | Phase 7 fallbacks | Done |
 |---|---|
@@ -125,7 +126,7 @@ NixOS-only paths, and the QuickShell runtime remains Nix-store 0.3.x
 | Brightness | `brightnessctl` get/set + NetworkPanel tile; live-verified (45% set → raw 29491). |
 | Calendar | Month grid with today highlight + event dots + agenda. |
 | matugen tie-in | Sampled extraction + persisted JSON + startup Theme override + `theme.palette` command + PATH hook for the binary. |
-| - | System RPM is built and verified (4.3M, `Requires: quickshell >= 0.3.2, mesa-libGL, (awww or hyprpaper), systemd-user`; staged via DNF-downloaded `rpm-build` without root). Runtime quickshell is the Nix store 0.3.2: Fedora's 0.2.1-git was downloaded, extracted, and run — it fails to load the shell at `BackgroundEffect.blurRegion` ("Non-existent attached object") and `Region.radius` ("Cannot assign to non-existent property"), both absent in 0.2.1 qmltypes but present in 0.3.2. The overlay layer itself exists in both, so the blocker is blur glass + rounded masks, not overlay. See `packaging/fedora.yaml` for the qmltypes evidence. Same fallback evidence (170 tests, clippy, lint, overlay) below. |
+| - | System RPM is built and verified (4.3M, `Requires: quickshell >= 0.3.2, mesa-libGL, (awww or hyprpaper), systemd-user`; staged via DNF-downloaded `rpm-build` without root). Runtime quickshell is the Nix store 0.3.2: Fedora's 0.2.1-git was downloaded, extracted, and run — it fails to load the shell at `BackgroundEffect.blurRegion` ("Non-existent attached object") and `Region.radius` ("Cannot assign to non-existent property"), both absent in 0.2.1 qmltypes but present in 0.3.2. The overlay layer itself exists in both, so the blocker is blur glass + rounded masks, not overlay. See `packaging/fedora.yaml` for the qmltypes evidence. Verification suite is 183 tests, clippy, lint, overlay (below). |
 
 ## Verified runs
 
