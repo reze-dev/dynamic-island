@@ -56,7 +56,13 @@ impl Domain {
         let clipboard = store.read::<Clipboard>("clipboard").unwrap_or_default();
 
         let engine = Engine::detect();
-        let wallpaper = Catalog::scan(&settings.wallpaper_dir(), engine);
+        let mut wallpaper = Catalog::scan(&settings.wallpaper_dir(), engine);
+        // The wallpaper that is on screen is state, not ephemeral: it is
+        // persisted alongside settings so "Now showing" survives a restart
+        // (`awww` keeps the pixels on its own; this is our memory of them).
+        if !settings.current_wallpaper.is_empty() {
+            wallpaper.current = Some(settings.current_wallpaper.clone());
+        }
 
         Self {
             notes: NoteStore::new(settings.notes_dir()),
@@ -139,6 +145,21 @@ mod tests {
         assert_eq!(domain.settings.theme, "midnight");
         assert!(domain.todos.items.is_empty());
         assert_eq!(domain.timer.phase, crate::data::timer::TimerPhase::Idle);
+    }
+
+    #[test]
+    fn the_current_wallpaper_survives_a_reload() {
+        let store = temp_store("wp-current");
+        {
+            let mut domain = Domain::load(store.clone());
+            domain.settings.current_wallpaper = "/wallpapers/storm.png".to_string();
+            domain.save_settings();
+        }
+        let domain = Domain::load(store);
+        assert_eq!(
+            domain.wallpaper.current.as_deref(),
+            Some("/wallpapers/storm.png")
+        );
     }
 
     #[test]

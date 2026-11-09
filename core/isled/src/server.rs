@@ -461,6 +461,8 @@ impl Server {
                             Ok(()) => {
                                 domain.wallpaper.current = Some(path.clone());
                                 domain.wallpaper.last_changed_unix = now_unix;
+                                domain.settings.current_wallpaper = path.clone();
+                                domain.save_settings();
                                 wallpaper_event = Some(path);
                             }
                             Err(err) => {
@@ -1843,7 +1845,14 @@ impl Server {
                 if url.trim().is_empty() {
                     return ServerMessage::reply_err(id, "a wallpaper url is required");
                 }
-                self.wallpaper_download(id, &url).await
+                // One tap gets and shows: by default the download is
+                // applied immediately. `apply: false` fetches into the
+                // catalog only.
+                let apply = args
+                    .get("apply")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(true);
+                self.wallpaper_download(id, &url, apply).await
             }
             "wallpaper.handoff-status" => {
                 let dir = crate::handoff::downloads_dir();
@@ -2074,6 +2083,8 @@ impl Server {
             let mut domain = self.domain.lock().await;
             domain.wallpaper.current = Some(path.clone());
             domain.wallpaper.last_changed_unix = unix_now();
+            domain.settings.current_wallpaper = path.clone();
+            domain.save_settings();
         }
         let _ = self.events.send(ServerMessage::event(
             "wallpaper.changed",
@@ -2173,7 +2184,7 @@ impl Server {
         }
     }
 
-    async fn wallpaper_download(&self, id: u64, url: &str) -> ServerMessage {
+    async fn wallpaper_download(&self, id: u64, url: &str, apply: bool) -> ServerMessage {
         let client = crate::wallhaven::WallhavenClient::new();
         let (bytes, mime) = match client.fetch_image(url).await {
             Ok(v) => v,
@@ -2208,6 +2219,14 @@ impl Server {
         {
             let mut domain = self.domain.lock().await;
             domain.rescan_wallpapers();
+        }
+        if apply {
+            // One tap downloads and shows: hand the saved file to the set
+            // path, which owns the engine apply, the palette, the current
+            // and the events from here.
+            return self
+                .wallpaper_set(id, path.to_string_lossy().into_owned())
+                .await;
         }
         if let Some(palette) = crate::palette::refresh_from_image(&path) {
             let _ = self.events.send(ServerMessage::event(
@@ -2337,6 +2356,11 @@ fn apply_setting(settings: &mut Settings, key: &str, value: &serde_json::Value) 
         "wallhaven_api_key" => {
             if let Some(key) = value.as_str() {
                 settings.wallhaven_api_key = key.to_string();
+            }
+        }
+        "current_wallpaper" => {
+            if let Some(path) = value.as_str() {
+                settings.current_wallpaper = path.to_string();
             }
         }
         _ => {}

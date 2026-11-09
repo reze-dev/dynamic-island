@@ -53,6 +53,11 @@ pub struct Settings {
     /// sent only to wallhaven.cc. Blank keeps searches SFW-only.
     #[serde(default)]
     pub wallhaven_api_key: String,
+    /// The wallpaper that is currently on screen (`""` = nothing set).
+    /// Persisted so "Now showing" survives a restart; `awww` keeps the
+    /// pixels across restarts of its own.
+    #[serde(default)]
+    pub current_wallpaper: String,
 }
 
 fn default_cache_max_bytes() -> u64 {
@@ -96,6 +101,7 @@ impl Default for Settings {
             high_contrast: false,
             wallhaven_purity: default_purity(),
             wallhaven_api_key: String::new(),
+            current_wallpaper: String::new(),
         }
     }
 }
@@ -159,6 +165,12 @@ mod tests {
     }
 
     #[test]
+    fn the_current_wallpaper_defaults_to_nothing_set() {
+        let settings = Settings::default();
+        assert!(settings.current_wallpaper.is_empty());
+    }
+
+    #[test]
     fn older_settings_files_without_wallhaven_keys_still_load() {
         // A settings.json written before the wallhaven keys existed must
         // deserialize with the SFW defaults, not fail.
@@ -166,6 +178,7 @@ mod tests {
         let settings: Settings = serde_json::from_str(json).unwrap();
         assert_eq!(settings.wallhaven_purity, "sfw");
         assert!(settings.wallhaven_api_key.is_empty());
+        assert!(settings.current_wallpaper.is_empty());
     }
 
     #[test]

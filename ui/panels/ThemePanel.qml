@@ -29,10 +29,18 @@ Item {
     /// refuses them without one, so the chips persist the tier and the
     /// search sends it.
     property string whPurity: "sfw"
+    /// Whether the daemon has a Wallhaven key saved. While true the key
+    /// box stays folded into a "Reset key" chip; it unfolds the moment
+    /// a higher tier is picked without a key, so the user always sees
+    /// where to type it.
+    property bool whKeySaved: false
+    property bool whKeyEditing: false
 
     Component.onCompleted: {
         if (panel.bridge && panel.bridge.settings && panel.bridge.settings.wallhaven_purity)
             panel.whPurity = panel.bridge.settings.wallhaven_purity;
+        if (panel.bridge && panel.bridge.settings && panel.bridge.settings.wallhaven_api_key)
+            panel.whKeySaved = true;
     }
     // The handoff tab: the daemon watches ~/Downloads and imports saves.
     property string handoffDir: ""
@@ -108,52 +116,107 @@ Item {
         bridge: panel.bridge
     }
 
+    // Now showing: the current wallpaper's thumbnail, its name, the engine
+    // status, and the rotation controls — one strip instead of a stack of
+    // cards. The current image is the answer to "what is my wallpaper?".
     Card {
-        id: controls
+        id: nowStrip
         anchors.top: staleBanner.bottom
         anchors.topMargin: Theme.spacingTight
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: Theme.spacing
         anchors.rightMargin: Theme.spacing
-        height: 46
+        height: 58
 
         Row {
             anchors.fill: parent
-            anchors.margins: Theme.spacingTight + 2
-            spacing: Theme.spacingTight + 2
+            anchors.margins: 9
+            spacing: 12
 
-            Icon {
+            Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
-                name: "image"
-                width: 15
-                height: 15
-                color: panel.engineOk ? Theme.toneInfo : Theme.toneWarn
+                width: 40
+                height: 40
+                radius: Theme.radiusSmall
+                color: Theme.surfaceFillLow
+                border.width: 1
+                border.color: Theme.outlineVariant
+                clip: true
+
+                Image {
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    visible: panel.current !== null
+                    source: panel.visible && panel.current ? "file://" + panel.current : ""
+                    sourceSize: Qt.size(160, 160)
+                    asynchronous: true
+                    fillMode: Image.PreserveAspectCrop
+                    smooth: true
+                }
+
+                Icon {
+                    anchors.centerIn: parent
+                    visible: panel.current === null
+                    name: "image"
+                    width: 18
+                    height: 18
+                    color: Theme.onSurfaceVariant
+                }
             }
 
             Column {
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 190
-                spacing: 1
+                width: 205
+                spacing: 2
 
                 Text {
                     width: parent.width
-                    text: panel.payload && panel.payload.engine
-                        ? "Engine · " + panel.payload.engine
-                        : "Engine · none"
-                    color: Theme.onSurface
+                    text: "NOW SHOWING"
+                    wrapMode: Text.NoWrap
+                    color: Theme.onSurfaceVariant
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.type.bodySmall.size
-                    font.weight: Theme.type.bodySmall.weight
-                    font.letterSpacing: Theme.type.bodySmall.tracking
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
                     elide: Text.ElideRight
                 }
 
                 Text {
                     width: parent.width
+                    text: panel.current
+                        ? panel.current.replace(/^.*\//, "")
+                        : "Nothing set"
+                    wrapMode: Text.NoWrap
+                    color: Theme.onSurface
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.type.titleMedium.size
+                    font.weight: Theme.type.titleMedium.weight
+                    font.letterSpacing: Theme.type.titleMedium.tracking
+                    elide: Text.ElideRight
+                }
+            }
+
+            Row {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 118
+                spacing: 6
+
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 8
+                    height: 8
+                    radius: 4
+                    color: panel.engineOk ? Theme.toneInfo : Theme.toneWarn
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - 14
                     text: panel.engineOk
-                        ? "ready"
-                        : "not answering — the catalog still works"
+                        ? (panel.payload && panel.payload.engine ? panel.payload.engine : "awww") + " · ready"
+                        : "engine down"
+                    wrapMode: Text.NoWrap
                     color: panel.engineOk ? Theme.onSurfaceVariant : Theme.toneWarn
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.type.labelSmall.size
@@ -191,21 +254,21 @@ Item {
         }
     }
 
-    // The directory.
-    Card {
+    // The directory, slimmed to a single line — it only needs the path.
+    Item {
         id: dirCard
-        anchors.top: controls.bottom
-        anchors.topMargin: Theme.spacingTight
+        anchors.top: nowStrip.bottom
+        anchors.topMargin: 2
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: Theme.spacing
         anchors.rightMargin: Theme.spacing
-        height: 36
+        height: 32
 
         Row {
             anchors.fill: parent
-            anchors.margins: Theme.spacingTight + 2
-            spacing: Theme.spacingTight
+            anchors.margins: 2
+            spacing: 8
 
             Icon {
                 anchors.verticalCenter: parent.verticalCenter
@@ -315,7 +378,10 @@ Item {
         dirField.text = dir;
     }
 
-    // The tabs: Local (the directory above) and Wallhaven (remote).
+    // The tabs: Local (the directory above) and Wallhaven (remote). One
+    // Material segmented control holds them; the selected segment is a
+    // filled pill inside the shared outline, not three separate cards.
+    // The search fields sit to its right.
     Row {
         id: tabs
         anchors.top: dirCard.bottom
@@ -324,34 +390,49 @@ Item {
         anchors.right: parent.right
         anchors.leftMargin: Theme.spacing
         anchors.rightMargin: Theme.spacing
-        height: 30
+        height: 44
         spacing: Theme.spacingTight
 
-        Repeater {
-            model: ["local", "wallhaven", "imported"]
-            Item {
-                required property var modelData
-                required property int index
-                width: 90
-                height: 30
+        Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            width: 268
+            height: 40
+            radius: 20
+            color: "transparent"
+            border.width: 1
+            border.color: Theme.outlineVariant
 
-                Rectangle {
-                    anchors.fill: parent
-                    radius: Theme.radiusSmall
-                    color: panel.tab === modelData ? Theme.primaryDim : Theme.surfaceFillLow
-                    border.width: 1
-                    border.color: panel.tab === modelData ? Theme.primary : Theme.outlineVariant
+            Row {
+                anchors.fill: parent
+                anchors.leftMargin: 2
+                anchors.rightMargin: 2
+                anchors.topMargin: 2
+                anchors.bottomMargin: 2
+                spacing: 4
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: modelData === "local" ? "Local" : (modelData === "wallhaven" ? "Wallhaven" : "Imported")
-                        color: panel.tab === modelData ? Theme.primary : Theme.onSurfaceVariant
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.type.labelSmall.size
-                        font.weight: Theme.type.labelSmall.weight
-                        font.letterSpacing: Theme.type.labelSmall.tracking
-                    }
-                }
+                Repeater {
+                    model: ["local", "wallhaven", "imported"]
+                    Item {
+                        required property var modelData
+                        required property int index
+                        width: 84
+                        height: 36
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 18
+                            color: panel.tab === modelData ? Theme.primaryDim : "transparent"
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData === "local" ? "Local" : (modelData === "wallhaven" ? "Wallhaven" : "Imported")
+                                color: panel.tab === modelData ? Theme.primary : Theme.onSurfaceVariant
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.type.labelLarge.size
+                                font.weight: Theme.type.labelLarge.weight
+                                font.letterSpacing: Theme.type.labelLarge.tracking
+                            }
+                        }
 
                 MouseArea {
                     anchors.fill: parent
@@ -364,13 +445,15 @@ Item {
                             panel.handoffStatus();
                     }
                 }
+                    }
+                }
             }
         }
 
         TextField {
             id: whSearchField
             anchors.verticalCenter: parent.verticalCenter
-            width: tabs.width - 90 * 3 - Theme.spacingTight * 3
+            width: tabs.width - 268 - Theme.spacingTight
             placeholder: "Search wallhaven…"
             visible: panel.tab === "wallhaven"
             onTextChanged: {
@@ -455,6 +538,8 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         panel.whPurity = modelData.name;
+                        if (!panel.whKeySaved && modelData.name !== "sfw")
+                            panel.whKeyEditing = true;
                         if (panel.bridge)
                             panel.bridge.callAndSay(
                                 "settings.set",
@@ -468,28 +553,134 @@ Item {
             }
         }
 
+        // The key area. Tiny by decision: a short field for the walk-in
+        // case, and a "Reset key" pill once a key is saved — the box
+        // never sits there unused.
         Item {
-            width: tabs.width - 72 * 3 - Theme.spacingTight * 3
+            width: tabs.width - 268 - Theme.spacingTight
             height: 28
 
-            TextField {
-                id: whKeyField
-                anchors.fill: parent
-                placeholder: "Wallhaven API key (blank = SFW-only)"
-                text: ""
-                onAccepted: {
-                    if (panel.bridge && text.trim() !== "") {
-                        panel.bridge.callAndSay(
-                            "settings.set",
-                            { "key": "wallhaven_api_key", "value": text.trim() },
-                            "Wallhaven API key saved",
-                            "Could not save the key");
+            Rectangle {
+                visible: !panel.whKeySaved || panel.whKeyEditing
+                anchors.verticalCenter: parent.verticalCenter
+                width: 150
+                height: 26
+                radius: Theme.radiusSmall
+                color: Theme.surfaceFillLow
+                border.width: input.activeFocus ? 2 : 1
+                border.color: input.activeFocus ? Theme.primary : Theme.outlineVariant
+
+                TextInput {
+                    id: input
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    verticalAlignment: TextInput.AlignVCenter
+                    color: Theme.onSurface
+                    selectionColor: Theme.primary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    selectByMouse: true
+                    clip: true
+                    onAccepted: {
+                        if (panel.bridge && text.trim() !== "") {
+                            panel.bridge.callAndSay(
+                                "settings.set",
+                                { "key": "wallhaven_api_key", "value": text.trim() },
+                                "Wallhaven API key saved",
+                                "Could not save the key");
+                            panel.whKeySaved = true;
+                        }
                         text = "";
+                        panel.whKeyEditing = false;
+                        panel.whSearch();
                     }
-                    panel.whSearch();
+                    Keys.onEscapePressed: (event) => {
+                        if (text !== "") text = "";
+                        else if (panel.whKeySaved) {
+                            panel.whKeyEditing = false;
+                            event.accepted = true;
+                        }
+                    }
                 }
-                onEscapePressed: {
-                    if (text !== "") text = "";
+
+                Text {
+                    visible: input.text === ""
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: panel.whKeySaved ? "New key (blank keeps saved)" : "Wallhaven API key"
+                    wrapMode: Text.NoWrap
+                    color: Theme.onSurfaceVariant
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    elide: Text.ElideRight
+                    width: parent.width - 16
+                }
+            }
+
+            Row {
+                visible: panel.whKeySaved && !panel.whKeyEditing
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 8
+
+                Icon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "check"
+                    width: 14
+                    height: 14
+                    color: Theme.toneGood
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "key saved"
+                    wrapMode: Text.NoWrap
+                    color: Theme.onSurfaceVariant
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.type.labelSmall.size
+                    font.weight: Theme.type.labelSmall.weight
+                    font.letterSpacing: Theme.type.labelSmall.tracking
+                }
+
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 88
+                    height: 26
+                    radius: 13
+                    color: Theme.surfaceFillLow
+                    border.width: 1
+                    border.color: Theme.outlineVariant
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Reset key"
+                        wrapMode: Text.NoWrap
+                        color: Theme.onSurfaceVariant
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.type.labelSmall.size
+                        font.weight: Theme.type.labelSmall.weight
+                        font.letterSpacing: Theme.type.labelSmall.tracking
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        hoverEnabled: true
+                        onClicked: {
+                            if (panel.bridge)
+                                panel.bridge.callAndSay(
+                                    "settings.set",
+                                    { "key": "wallhaven_api_key", "value": "" },
+                                    "Wallhaven API key removed",
+                                    "Could not remove the key");
+                            panel.whKeySaved = false;
+                            panel.whKeyEditing = true;
+                            panel.whSearch();
+                        }
+                    }
                 }
             }
         }
@@ -539,7 +730,7 @@ Item {
         Grid {
             id: grid
             width: scroller.width
-            columns: 4
+            columns: 3
             columnSpacing: Theme.spacingTight
             rowSpacing: Theme.spacingTight
             visible: panel.tab === "local"
@@ -550,66 +741,137 @@ Item {
             Item {
                 required property var modelData
 
-                width: (grid.width - Theme.spacingTight * 3) / 4
-                height: width * 0.62
+                width: (grid.width - Theme.spacingTight * 2) / 3
+                height: width * 0.625
 
                 Rectangle {
                     id: frame
                     anchors.fill: parent
-                    radius: Theme.radiusSmall
+                    radius: Theme.radiusMedium
                     color: Theme.surfaceFillLow
-                    border.width: panel.current === modelData.path ? 2 : 0
-                    border.color: Theme.primary
                     clip: true
 
                     Image {
                         anchors.fill: parent
-                        anchors.margins: 1
                         // The thumbnail is the file itself, decoded small.
                         // The catalog holds paths, not copies.
                         source: panel.visible && modelData.path ? "file://" + modelData.path : ""
-                        sourceSize: Qt.size(240, 150)
+                        sourceSize: Qt.size(320, 200)
                         asynchronous: true
                         fillMode: Image.PreserveAspectCrop
                         smooth: true
+                    }
+
+                    // The glyph shows through while the image is decoding
+                    // (and on decode failures), so the tile is never an
+                    // empty box.
+                    Icon {
+                        anchors.centerIn: parent
+                        z: -1
+                        name: "image"
+                        width: 20
+                        height: 20
+                        color: Theme.onSurfaceVariant
+                        opacity: 0.35
                     }
 
                     Rectangle {
                         anchors.fill: parent
                         radius: parent.radius
                         color: "transparent"
+                        border.width: panel.current === modelData.path ? 2 : 1
+                        border.color: panel.current === modelData.path ? Theme.primary : Theme.outlineVariant
+                    }
+
+                    // The active wallpaper announces itself without needing
+                    // the hover state.
+                    Rectangle {
+                        visible: panel.current === modelData.path
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.margins: 6
+                        width: nowLabel.implicitWidth + 14
+                        height: 18
+                        radius: 9
+                        color: Theme.primaryDim
                         border.width: 1
-                        border.color: Theme.outlineVariant
+                        border.color: Theme.primary
+
+                        Text {
+                            id: nowLabel
+                            anchors.centerIn: parent
+                            text: "Now"
+                            color: Theme.primary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.type.labelSmall.size
+                            font.weight: Theme.type.labelLarge.weight
+                            font.letterSpacing: Theme.type.labelSmall.tracking
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        visible: tileArea.containsMouse
+
+                        Rectangle {
+                            anchors.fill: parent
+                            // A shallow scrim only at the bottom, where the
+                            // metadata sits, instead of dulling the image.
+                            color: Theme.scrim
+                        }
+                    }
+                }
+
+                Column {
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.margins: 8
+                    visible: tileArea.containsMouse
+                    spacing: 0
+
+                    Text {
+                        width: parent.width - 44
+                        text: modelData.name
+                        wrapMode: Text.NoWrap
+                        color: Theme.onSurface
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.type.titleSmall.size
+                        font.weight: Theme.type.titleSmall.weight
+                        font.letterSpacing: Theme.type.titleSmall.tracking
+                        elide: Text.ElideRight
                     }
                 }
 
                 Rectangle {
-                    anchors.fill: parent
-                    radius: Theme.radiusSmall
-                    color: "transparent"
-                    visible: tileArea.containsMouse
-
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: 1
-                        radius: Theme.radiusSmall
-                        color: Theme.scrim
-                    }
-                }
-
-                Text {
                     anchors.bottom: parent.bottom
-                    anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.margins: 5
+                    anchors.margins: 6
+                    width: 34
+                    height: 34
+                    radius: 17
                     visible: tileArea.containsMouse
-                    text: modelData.name
-                    color: Theme.onSurface
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.type.labelSmall.size
-                    font.weight: Theme.type.labelSmall.weight
-                    font.letterSpacing: Theme.type.labelSmall.tracking
-                    elide: Text.ElideRight
+                    color: Theme.primary
+
+                    Icon {
+                        anchors.centerIn: parent
+                        name: "check"
+                        width: 18
+                        height: 18
+                        color: Theme.primaryInk
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: panel.bridge
+                            ? panel.bridge.callAndSay(
+                                "wallpaper.set",
+                                { "path": modelData.path },
+                                "Wallpaper set")
+                            : null
+                    }
                 }
 
                 MouseArea {
@@ -635,7 +897,7 @@ Item {
         Grid {
             id: whGrid
             width: scroller.width
-            columns: 4
+            columns: 3
             columnSpacing: Theme.spacingTight
             rowSpacing: Theme.spacingTight
             visible: panel.tab === "wallhaven"
@@ -646,23 +908,32 @@ Item {
                 Item {
                     required property var modelData
 
-                    width: (whGrid.width - Theme.spacingTight * 3) / 4
-                    height: width * 0.62
+                    width: (whGrid.width - Theme.spacingTight * 2) / 3
+                    height: width * 0.625
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: Theme.radiusSmall
+                        radius: Theme.radiusMedium
                         color: Theme.surfaceFillLow
                         clip: true
 
                         Image {
                             anchors.fill: parent
-                            anchors.margins: 1
                             source: panel.visible && modelData.thumb_path ? "file://" + modelData.thumb_path : ""
-                            sourceSize: Qt.size(240, 150)
+                            sourceSize: Qt.size(320, 200)
                             asynchronous: true
                             fillMode: Image.PreserveAspectCrop
                             smooth: true
+                        }
+
+                        Icon {
+                            anchors.centerIn: parent
+                            z: -1
+                            name: "image"
+                            width: 20
+                            height: 20
+                            color: Theme.onSurfaceVariant
+                            opacity: 0.35
                         }
 
                         // The free palette, as a sliver at the bottom.
@@ -677,7 +948,7 @@ Item {
                                 model: modelData.colors
                                 Rectangle {
                                     required property var modelData
-                                    width: whGrid.width / 4 / modelData.length
+                                    width: whGrid.width / 3 / modelData.length
                                     height: 4
                                     color: modelData
                                 }
@@ -691,21 +962,68 @@ Item {
                             border.width: 1
                             border.color: Theme.outlineVariant
                         }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: parent.radius
+                            visible: whTile.containsMouse
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: Theme.scrim
+                            }
+                        }
                     }
 
-                    Text {
+                    Column {
                         anchors.bottom: parent.bottom
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.margins: 5
+                        anchors.margins: 8
                         visible: whTile.containsMouse
-                        text: modelData.resolution + (modelData.source ? " · " + modelData.source : "")
-                        color: Theme.onSurface
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.type.labelSmall.size
-                        font.weight: Theme.type.labelSmall.weight
-                        font.letterSpacing: Theme.type.labelSmall.tracking
-                        elide: Text.ElideRight
+                        spacing: 0
+
+                        Text {
+                            width: parent.width - 44
+                            text: modelData.resolution + " · " + Math.round(modelData.file_size / 104857.6) / 10 + " MB"
+                            wrapMode: Text.NoWrap
+                            color: Theme.onSurface
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.type.titleSmall.size
+                            font.weight: Theme.type.titleSmall.weight
+                            font.letterSpacing: Theme.type.titleSmall.tracking
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        anchors.right: parent.right
+                        anchors.margins: 6
+                        width: 34
+                        height: 34
+                        radius: 17
+                        visible: whTile.containsMouse
+                        color: Theme.primary
+
+                        Icon {
+                            anchors.centerIn: parent
+                            name: "download"
+                            width: 18
+                            height: 18
+                            color: Theme.primaryInk
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: panel.bridge
+                                ? panel.bridge.callAndSay(
+                                    "wallpaper.download",
+                                    { "url": modelData.path, "apply": true },
+                                    "Downloaded and set the wallpaper")
+                                : null
+                        }
                     }
 
                     MouseArea {
@@ -716,8 +1034,8 @@ Item {
                         onClicked: panel.bridge
                             ? panel.bridge.callAndSay(
                                 "wallpaper.download",
-                                { "url": modelData.path },
-                                "Downloaded into your catalog")
+                                { "url": modelData.path, "apply": true },
+                                "Downloaded and set the wallpaper")
                             : null
                     }
                 }
