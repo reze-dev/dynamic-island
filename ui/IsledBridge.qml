@@ -279,7 +279,11 @@ QtObject {
         case "tray.changed":
             // The payload is the full item list (with resolved icon paths
             // and tooltips), so assign directly instead of refetching.
+            // The event payload carries no owner field, so refresh it
+            // too — otherwise trayOwner goes stale the first time the
+            // bus changes hands.
             bridge.tray = data || [];
+            bridge.reloadTray();
             break;
         case "session.lagged":
             bridge.lastError = "missed " + data.missed + " events";

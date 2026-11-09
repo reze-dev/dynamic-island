@@ -25,7 +25,7 @@
 #    The Home Manager module (`nix/module.nix`) is the NixOS equivalent.
 #
 # Evidence the system path is complete, not missing plumbing:
-# tarball passes `just lint-qml`, `cargo test` (170), `clippy`, and
+# tarball passes `just lint-qml`, `cargo test` (183), `clippy`, and
 # `swaymsg` reports `('overlay', 'quickshell')` on Sway with the EGL env
 # injected by `install-units`/`install.sh`. Nothing in the shell fails
 # because a `.deb/.rpm` is absent; it either talks to the daemon over the
