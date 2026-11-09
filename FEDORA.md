@@ -5,10 +5,14 @@
 # (swayfx). The daemon and the QML are unchanged; only packaging and the
 # compositor keybinds differ.
 
-## What works here (verified 2026-11-09)
+## What works here (verified 2026-11-09, re-run: final matrix)
 
-- `cargo test` (178 tests), `cargo clippy`, `cargo fmt`, `just lint-qml`,
+- `cargo test` (183 tests), `cargo clippy`, `cargo fmt`, `just lint-qml`,
   `just preview` / `just preview-live` all pass on Fedora.
+- Live: `swaymsg` overlay `('overlay','quickshell')`; `tray.list` owner
+  `"other"` (Waybar steady state); `compositor.info` kitty/eDP-1
+  1920×1080; `wallpaper.cache` budget/prune on; `notifications.send` +
+  `view.set 2` renders the panel with body text.
 - `just install-units` writes `~/.config/systemd/user/isled.service` and
   `quickshell.service` with store paths baked in, and `just start` runs
   them under systemd user. Both services report `active (running)` and
@@ -113,7 +117,10 @@ platform/environment ones (not missing features):
   unit-tested; Sway is the only live-verified compositor on this host.
 - QuickShell runtime is Nix-store 0.3.x (Fedora 0.2.1-git cannot load
   `shell.qml`: absent `_BackgroundEffect` + `Region.radius` — evidence
-  in `packaging/fedora.yaml`). The RPM's `Requires: quickshell >= 0.3.2`
+  in `packaging/fedora.yaml`).
+- Staleness renders rest on the mocked-bridge harness (plugins not
+  installable headless); live renders are asserted where compositor
+  state permits. The RPM's `Requires: quickshell >= 0.3.2`
   is therefore declarable, and the user-local tarball is the supported
   install path on Fedora 45 today.
 
