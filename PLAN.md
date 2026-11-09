@@ -840,6 +840,12 @@ meets its criterion.
   `isled.service`, `awww-daemon`, and the shared `isle.target`.
 - Keybinds in **both** composulators, both routed through `isled call` (§9.4).
 
+> Fedora 45 (Sway) scope addendum, 2026-11-09: this exit criterion is
+> met on Sway + QuickShell 0.3.x only. Niri/Hyprland columns are
+> adapter-complete and unit-tested; live verification is blocked on
+> this host (see FEDORA.md "Platform scoping").
+
+
 **Exit:** all views reachable by keybind and by click; identical on both.
 
 ### Phase 2 — Live activity core (2-3 days)

@@ -228,6 +228,38 @@ platform/environment ones (not missing features):
   + full UI + unit templates).
 - `grim` screenshot shows the idle pill (dot + clock) at the top centre.
 
+## Verifiable set (2026-11-09, Fedora 45 Sway host)
+
+What this machine can actually prove, and what it cannot:
+
+**Verified live (Sway, QuickShell 0.3.2 from the Nix store):**
+`swaymsg` overlay `('overlay','quickshell')`, `tray.list` owner `"other"`
+(Waybar owns the bus — the panel explains it), `compositor.info`
+(kitty/eDP-1 1920×1080), `wallpaper.cache` budget+prune, brightness
+45% set + raw 29491 round-trip, matugen/`palette.json` sampling,
+`notifications.send` render with bodies, queue persist/restore E2E,
+offscreen panel renders (light theme, month grid, matugen accent).
+
+**Unit-tested only (code complete; no live host here):**
+niri 26.04 and Hyprland 0.56.2 adapter parse/translate paths.
+Nested runs abort on this host: niri panics `Egl(DisplayNotSupported)`,
+Hyprland aborts on `xdg_wm_base` version mismatch against SwayFX.
+A NixOS/niri host re-runs the same two commands from "Platform
+scoping" above.
+
+**Runtime contract (not negotiable without a newer package):**
+Crash-level requirement is QuickShell ≥ 0.3.0 — Fedora 0.2.1-git lacks
+the `_BackgroundEffect` module and `Region.radius`. The RPM
+`Requires: quickshell >= 0.3.2` declares this; until Fedora ships one,
+the user-local tarball + Nix store is the supported install. That is a
+distribution fact, not an implementation gap, and is committed to
+`packaging/fedora.yaml` as evidence.
+
+**Finished work, not re-litigated here:** tray ownership + liveness,
+`SlideText` animator, staleness banners, queue persistence + flush
+ordering, pixmap TTL + freshness, shared LRU budget, brightness,
+dark/light, month grid, matugen sampling tie-in.
+
 ## Acceptance audit (2026-11-09, PLAN.md §7 exit criteria)
 
 | PLAN phase / exit | Status | Evidence (this machine) |
