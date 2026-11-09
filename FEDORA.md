@@ -306,7 +306,7 @@ staleness shot). Final recommit state: see `git log`.
 |---|---|---|
 | Sway (this host) | **Full**: overlay layer, tray ownership, notifications, context, panels | `swaymsg` + grim renders, this-session |
 | Niri 26.04 | Nesting attempted; blocked: panics `Egl(DisplayNotSupported)` even with system DRI + software GL (nested render has no EGL target under this SwayFX session) | Adapter parse/translate unit-tested (`compositor.rs`); nested attempt log `/tmp/opencode/niri-a.log` |
-| Hyprland 0.56.2 | Nesting attempted; blocked: parent advertises `xdg_wm_base` v12, Hyprland wants ≤v5 (protocol mismatch abort) | Crash report + `hyp-start` log, 2026-11-09; adapter queries unit-tested |
+| Hyprland 0.56.2 | Nesting attempted twice. Under SwayFX: parent advertises `xdg_wm_base` v12, Hyprland wants ≤v5 (protocol mismatch abort). Under weston 16 (wayland backend, pixman): log goes further, then `CBackend::create() failed!` (no GBM render node for the nested backend) — same class as niri's EGL failure | Adapter queries unit-tested; crash report + `/tmp/opencode/hyp-weston.log` |
 | QuickShell runtime | Nix-store 0.3.x required (frozen paths baked by `just install-units`, EGL env lines). Fedora 0.2.1-git cannot load `shell.qml` (`_BackgroundEffect` absent + `Region.radius` absent from its qmltypes). | qmltypes diff in `packaging/fedora.yaml` |
 
 Verification on the *next* host: launch the compositor with a minimal
