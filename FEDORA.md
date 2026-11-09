@@ -114,11 +114,21 @@ platform/environment ones (not missing features):
 - The `matugen` binary is an optional accelerator (`matugen image`
   hook reserved); the primary path is the sampled extractor — always
   available, no extra dependency.
-- Niri/Helix of the two target compositors are adapter-complete and
-  unit-tested; Sway is the only live-verified compositor on this host.
+- Niri/Hyprland adapter parse/translate paths are unit-tested
+  (`core/isled/tests/`); nested live attempts (2026-11-09):
+  - Niri 26.04 (nixpkgs) panics `Egl(DisplayNotSupported)` even with
+    system DRI (`/usr/lib64/dri`) and software GL — no EGL target for
+    a nested output under this SwayFX session.
+  - Hyprland 0.56.2 (nixpkgs) aborts: parent advertises
+    `xdg_wm_base` v12, Hyprland wants ≤v5.
+  Until a compatible nested parent exists, live verification is
+  Sway-only and the adapter paths stay unit-tested.
 - QuickShell runtime is Nix-store 0.3.x (Fedora 0.2.1-git cannot load
   `shell.qml`: absent `_BackgroundEffect` + `Region.radius` — evidence
-  in `packaging/fedora.yaml`).
+  in `packaging/fedora.yaml`). Building QuickShell 0.3.x from source
+  needs the Qt6 development toolchain, which this machine does not have
+  (`dnf` sudo is interactive and the user is away), so Nix is the only
+  0.3.x source here by environment, not by preference.
 - Staleness renders rest on the mocked-bridge harness (plugins not
   installable headless); live renders are asserted where compositor
   state permits. The RPM's `Requires: quickshell >= 0.3.2`
