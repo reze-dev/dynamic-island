@@ -24,7 +24,7 @@ Item {
     Rectangle {
         id: badge
         visible: root.showGlyph
-        width: root.compact ? 24 : 32
+        width: root.compact ? 24 : 30
         height: width
         radius: width / 2
         color: Theme.stateLayer(root.tone, 0.16)
@@ -45,15 +45,18 @@ Item {
         anchors.leftMargin: badge.visible ? Theme.spacingTight + 4 : 0
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 1
+        // The column shares the pill's whole height (40): two lines at
+        // bodyLarge + bodySmall are a full cell taller than the band, so
+        // their edges clip. One step smaller keeps both rows inside.
+        spacing: 0
 
         SlideText {
             width: parent.width
             text: root.title
             color: Theme.onSurface
-            pixelSize: root.compact ? Theme.type.bodyMedium.size : Theme.type.bodyLarge.size
-            weight: root.compact ? Theme.type.bodyMedium.weight : Theme.type.bodyLarge.weight
-            tracking: root.compact ? Theme.type.bodyMedium.tracking : Theme.type.bodyLarge.tracking
+            pixelSize: Theme.type.bodyMedium.size
+            weight: Theme.type.bodyMedium.weight
+            tracking: Theme.type.bodyMedium.tracking
         }
 
         SlideText {

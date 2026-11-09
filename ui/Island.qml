@@ -169,6 +169,10 @@ Rectangle {
     // ---- reacting ----
 
     /// Show an event: grow, show it, and fold back after its dwell time.
+    /// While a panel is open the pill must not steal the screen: the tone
+    /// latches and the event stays in the panel's queue (the shell can
+    /// announce it with the snackbar) instead of collapsing the reader's
+    /// place. Only a collapsed island changes shape.
     function triggerWith(activity) {
         if (!activity)
             return;
@@ -178,7 +182,8 @@ Rectangle {
         }
         trigger = activity;
         latchedTone = activity.tone ? activity.tone : latchedTone;
-        mode = "triggered";
+        if (mode !== "full")
+            mode = "triggered";
         dwell.restart();
     }
 
@@ -312,7 +317,7 @@ Rectangle {
             id: peekRow
             anchors.left: parent.left
             anchors.leftMargin: Theme.spacing
-            anchors.right: vitals.left
+            anchors.right: peekRight.left
             anchors.rightMargin: Theme.spacing
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.spacingTight
@@ -344,53 +349,57 @@ Rectangle {
             }
         }
 
-        Column {
-            id: vitals
+        // The right edge: the timer ring while one runs, the clock
+        // otherwise. Nothing else goes here — raw utilization numbers
+        // were the ugliest part of the old peek.
+        Row {
+            id: peekRight
             anchors.right: parent.right
             anchors.rightMargin: Theme.spacing
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 4
-            width: 96
+            spacing: 6
 
             Row {
-                spacing: Theme.spacingTight
-                Text {
-                    text: "cpu"
-                    color: Theme.onSurfaceVariant
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.type.labelSmall.size
-                    font.weight: Theme.type.labelSmall.weight
-                    font.letterSpacing: Theme.type.labelSmall.tracking
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+                visible: island.bridge && island.bridge.timer && island.bridge.timer.running
+
+                ProgressRing {
+                    anchors.verticalCenter: parent.verticalCenter
                     width: 22
-                }
-                MiniBar {
-                    width: 58
-                    value: island.bridge && island.bridge.stats
-                        ? (island.bridge.stats.cpu_percent || 0) / 100
+                    height: 22
+                    thickness: 3
+                    progress: island.bridge && island.bridge.timer
+                        ? (island.bridge.timer.progress || 0)
                         : 0
                     tone: Theme.primary
                 }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: island.bridge && island.bridge.timer
+                        ? Format.duration(island.bridge.timer.remaining_ms)
+                        : ""
+                    wrapMode: Text.NoWrap
+                    color: Theme.onSurfaceVariant
+                    font.family: Theme.monoFamily
+                    font.pixelSize: Theme.type.labelMedium.size
+                    font.weight: Theme.type.labelMedium.weight
+                    font.letterSpacing: Theme.overlineTracking
+                }
             }
 
-            Row {
-                spacing: Theme.spacingTight
-                Text {
-                    text: "mem"
-                    color: Theme.onSurfaceVariant
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.type.labelSmall.size
-                    font.weight: Theme.type.labelSmall.weight
-                    font.letterSpacing: Theme.type.labelSmall.tracking
-                    width: 22
-                }
-                MiniBar {
-                    width: 58
-                    value: island.bridge && island.bridge.stats
-                        ? (island.bridge.stats.memory_used_bytes || 0)
-                          / Math.max(1, island.bridge.stats.memory_total_bytes || 1)
-                        : 0
-                    tone: Theme.toneGood
-                }
+            Text {
+                id: peekClock
+                anchors.verticalCenter: parent.verticalCenter
+                visible: !island.bridge || !island.bridge.timer || !island.bridge.timer.running
+                text: Format.clock()
+                wrapMode: Text.NoWrap
+                color: Theme.onSurfaceVariant
+                font.family: Theme.monoFamily
+                font.pixelSize: Theme.type.labelMedium.size
+                font.weight: Theme.type.labelMedium.weight
+                font.letterSpacing: Theme.overlineTracking
             }
         }
     }
@@ -433,56 +442,9 @@ Rectangle {
             SlideActivity {
                 id: triggerActivity
                 anchors.verticalCenter: parent.verticalCenter
-                width: triggerRow.width - pulse.width - triggerRow.spacing * 2
+                width: triggerRow.width
                 height: 40
                 activity: island.trigger
-            }
-
-            // The bars that say something is happening.
-            Row {
-                id: pulse
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 3
-                height: 14
-
-                Repeater {
-                    model: 4
-
-                    Item {
-                        id: pulseBar
-                        required property int index
-
-                        width: 3
-                        height: 14
-
-                        Rectangle {
-                            id: bar
-                            width: parent.width
-                            height: 6
-                            y: (parent.height - height) / 2
-                            radius: width / 2
-                            color: Theme.primary
-
-                            SequentialAnimation on height {
-                                running: true
-                                loops: Animation.Infinite
-                                PauseAnimation {
-                                    duration: pulseBar.index * 70
-                                }
-                                NumberAnimation {
-                                    to: 13
-                                    duration: 380
-                                    easing: Theme.decelerate
-                                }
-                                NumberAnimation {
-                                    to: 6
-                                    duration: 380
-                                    easing: Theme.accelerate
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }

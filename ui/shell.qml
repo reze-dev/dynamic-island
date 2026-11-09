@@ -182,7 +182,13 @@ PanelWindow {
         onViewRequested: (index) => root.showView(index)
         onViewStepped: (delta) => root.stepView(delta)
         onFocusRequested: root.focusIsland()
-        onActivityTriggered: (activity) => island.triggerWith(activity)
+        // In a collapsed island the event morphs the island as before.
+        // From an open panel it keeps the panel and announces instead.
+        onActivityTriggered: (activity) => {
+            island.triggerWith(activity);
+            if (island.mode === "full")
+                root.notify((activity.title || "Something happened") + (activity.subtitle ? " · " + activity.subtitle : ""), "");
+        }
         onNoticeRaised: (message, action) => root.notify(message, action)
     }
 
