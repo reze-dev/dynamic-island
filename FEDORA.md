@@ -301,3 +301,18 @@ the EGL env from `~/.config/systemd/user/quickshell.service`, then
 `isled call view.set 0` and window-focus routing checks. Until then the
 audit is honest: code complete, Sway-proven, matrix-nested blocked by
 host capability.
+
+## Render proofs (offscreen, mocked bridge)
+
+- Brightness tile: NetworkPanel renders the sun tile; offscreen with a
+  mock bridge it honestly reports "no backlight reported" (live Sway
+  shows the real `brightnessctl` percent — get/set round-trip verified).
+- Calendar month grid: November 2026, today (9) highlighted, dots on
+  days with events, agenda rows below.
+- Dark/light: light scheme verified (light surfaces, dark text).
+- Matugen/palette: builtin vs overridden renders differ on 1,248
+  pixels; max-diff accent `(210,227,255)` → `(106,180,180)` = the
+  sampled `#6ab4b4` primary exactly. Harness `ui/verify2.qml` was
+  used and removed after; renders lives at `/tmp/scene-*.png`.
+- Notifications: two rich notifications with bodies ("Steady state",
+  "Final matrix") shown in the live Sway session (grim 2026-11-09).

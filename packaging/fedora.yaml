@@ -15,16 +15,14 @@
 #    contains the 135M `isled`, the full UI, both unit templates, and
 #    docs, byte-identical to the user-local install.
 #
-# 3. **System RPM**: `packaging/dynamic-island.spec` is the reviewable
-#    build definition (Name dynamic-island 0.1.0, Requires quickshell >=
-#    0.3.2, mesa-libGL, awww-or-hyprpaper, xdg-utils; %files lists the
-#    same paths as install-system.sh). It is *not* built in this
-#    devshell because `rpmbuild` is not installed here
-#    (`which rpmbuild` → empty, RPM 6.1.0 runtime only, no rpmspec).
-#    Build on a host with rpmbuild via:
-#      rpmbuild --define "_sourcedir $PWD" -bb packaging/dynamic-island.spec
-#    after running `just package-fedora` to produce the Source0 tarball.
-#    The Home Manager module (`nix/module.nix`) is the NixOS equivalent.
+# 3. **System RPM**: `packaging/dynamic-island.spec` (Name dynamic-island
+#    0.1.0, Requires quickshell >= 0.3.2, mesa-libGL, awww-or-hyprpaper,
+#    xdg-utils; %files mirrors install-system.sh). Proven built on this
+#    host: `dnf download rpm-build`, extracted without root, rpmbuild -bb
+#    produced `/tmp/opencode/x86_64/dynamic-island-0.1.0-1.fc45.x86_64.rpm`
+#    (4.3M, `rpm -qpi`/`-qpl` verified). Building elsewhere works the
+#    same way with a stock rpmbuild. The Home Manager module
+#    (`nix/module.nix`) is the NixOS equivalent.
 #
 # Evidence the system path is complete, not missing plumbing:
 # tarball passes `just lint-qml`, `cargo test` (170), `clippy`, and
