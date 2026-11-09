@@ -72,9 +72,12 @@ impl Server {
     pub fn with_domain(socket: PathBuf, claims: Claims, domain: Domain) -> Arc<Self> {
         let (events, _) = broadcast::channel(EVENT_BUFFER);
         let hub = Hub::detached(events.clone());
-        if claims.notifications {
-            notify::spawn_expiry_sweep(Arc::clone(&hub));
-        }
+        // Expiry is unconditional: even without claiming the bus name,
+        // notifications ingested via `notifications.send` (direct IPC
+        // tests, demos, scripts) carry expire_timeout values that must
+        // be honored. The sweep is cheap (one lock per second) and a
+        // no-op on an idle store.
+        notify::spawn_expiry_sweep(Arc::clone(&hub));
         Arc::new(Self {
             socket,
             snapshot: snapshot(),
