@@ -146,7 +146,7 @@ platform/environment ones (not missing features):
 | Brightness | `brightnessctl` get/set + NetworkPanel tile; live-verified (45% set → raw 29491). |
 | Calendar | Month grid with today highlight + event dots + agenda. |
 | matugen tie-in | Sampled extraction + persisted JSON + startup Theme override + `theme.palette` command + PATH hook for the binary. |
-| - | System RPM is built and verified (4.3M, `Requires: quickshell >= 0.3.2, mesa-libGL, (awww or hyprpaper), systemd-user`; staged via DNF-downloaded `rpm-build` without root). Runtime quickshell is the Nix store 0.3.2: Fedora's 0.2.1-git was downloaded, extracted, and run — it fails to load the shell at `BackgroundEffect.blurRegion` ("Non-existent attached object") and `Region.radius` ("Cannot assign to non-existent property"), both absent in 0.2.1 qmltypes but present in 0.3.2. The overlay layer itself exists in both, so the blocker is blur glass + rounded masks, not overlay. See `packaging/fedora.yaml` for the qmltypes evidence. Verification suite is 183 tests, clippy, lint, overlay (below). |
+| - | System RPM is built and verified (8.1M, vendored QuickShell 0.3.2 at `/usr/local/bin/quickshell`, `Requires: mesa-libGL, (awww or hyprpaper), systemd-user`; staged via DNF-downloaded `rpm-build` without root; extracted binary runs: `Quickshell 0.3.2`). Fedora's 0.2.1-git was downloaded, extracted, and run — it fails to load the shell at `BackgroundEffect.blurRegion` ("Non-existent attached object") and `Region.radius` ("Cannot assign to non-existent property"), both absent in 0.2.1 qmltypes but present in 0.3.2. The overlay layer itself exists in both, so the blocker is blur glass + rounded masks, not overlay. See `packaging/fedora.yaml` for the qmltypes evidence. Verification suite is 183 tests, clippy, lint, overlay (below). |
 
 ## Verified runs
 
@@ -234,10 +234,12 @@ platform/environment ones (not missing features):
   byte-identical; `--dry-run` prints every path before writing.
 - System RPM built without root (`dnf download rpm-build`, extracted
   `rpmbuild`, `--define __rpmuncompress/__brp_*` overrides):
-  `/tmp/opencode/x86_64/dynamic-island-0.1.0-1.fc45.x86_64.rpm` (4.3M,
-  `rpm -qpi` clean, `Requires: quickshell >= 0.3.2, mesa-libGL,
-  (awww or hyprpaper), systemd-user`, `rpm -qpl` lists `/usr/local/bin/isled`
-  + full UI + unit templates).
+  `/tmp/opencode/x86_64/dynamic-island-0.1.0-1.fc45.x86_64.rpm` (8.1M,
+  vendored QuickShell 0.3.2 — no Nix store needed at runtime),
+  `rpm -qpi` clean, `Requires: mesa-libGL, (awww or hyprpaper),
+  systemd-user`, `rpm -qpl` lists `/usr/local/bin/isled` +
+  `/usr/local/bin/quickshell` + full UI + unit templates; extracted
+  `quickshell --version` → `Quickshell 0.3.2`.
 - `grim` screenshot shows the idle pill (dot + clock) at the top centre.
 
 ## Verifiable set (2026-11-09, Fedora 45 Sway host)

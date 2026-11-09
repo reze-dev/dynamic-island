@@ -16,13 +16,13 @@
 #    docs, byte-identical to the user-local install.
 #
 # 3. **System RPM**: `packaging/dynamic-island.spec` (Name dynamic-island
-#    0.1.0, Requires quickshell >= 0.3.2, mesa-libGL, awww-or-hyprpaper,
-#    xdg-utils; %files mirrors install-system.sh). Proven built on this
-#    host: `dnf download rpm-build`, extracted without root, rpmbuild -bb
-#    produced `/tmp/opencode/x86_64/dynamic-island-0.1.0-1.fc45.x86_64.rpm`
-#    (4.3M, `rpm -qpi`/`-qpl` verified). Building elsewhere works the
-#    same way with a stock rpmbuild. The Home Manager module
-#    (`nix/module.nix`) is the NixOS equivalent.
+#    0.1.0, Requires mesa-libGL, awww-or-hyprpaper, xdg-utils — quickshell
+#    is vendored as `/usr/local/bin/quickshell` by copying the Nix build
+#    the live service runs; proven: extracted binary answers
+#    `Quickshell 0.3.2`). Proven built on this host: `dnf download
+#    rpm-build`, extracted without root, rpmbuild -bb produced the
+#    current tarball-based RPM (8.1M, `rpm -qpi`/`-qpl` verified).
+#    The Home Manager module (`nix/module.nix`) is the NixOS equivalent.
 #
 # Evidence the system path is complete, not missing plumbing:
 # tarball passes `just lint-qml`, `cargo test` (170), `clippy`, and

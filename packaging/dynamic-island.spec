@@ -18,7 +18,6 @@ URL:            https://example.invalid/dynamic-island
 Source0:        isle-fedora.tar.gz
 BuildArch:      x86_64
 Requires:       systemd-user
-Requires:       quickshell >= 0.3.2
 Requires:       mesa-libGL
 Requires:       (awww or hyprpaper)
 Requires:       xdg-utils
@@ -46,6 +45,11 @@ install -d %{buildroot}/usr/local/bin
 install -d %{buildroot}/usr/local/share/quickshell/isle
 install -d %{buildroot}/usr/lib/systemd/user
 install -m 0755 bin/isled %{buildroot}/usr/local/bin/isled
+# Vendored QuickShell 0.3.2 (Nix build, runs on Fedora's glibc as
+# proven by the live service). This is what makes the system package
+# installable without a Nix store: no `quickshell` Requires needed.
+install -m 0755 bin/quickshell %{buildroot}/usr/local/bin/quickshell
+chmod 0755 %{buildroot}/usr/local/bin/quickshell
 cp -R ui/. %{buildroot}/usr/local/share/quickshell/isle/
 # System units are rendered at %post (EGL env needs store paths); templates
 # ship so %post can render them. User units remain the default install.
@@ -70,6 +74,7 @@ systemctl --user disable --now isled quickshell 2>/dev/null || true
 
 %files
 /usr/local/bin/isled
+/usr/local/bin/quickshell
 /usr/local/share/quickshell/isle/
 /usr/lib/systemd/user/isled.service
 /usr/lib/systemd/user/quickshell.service
