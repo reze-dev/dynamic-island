@@ -74,14 +74,26 @@ PanelWindow {
         ? isled.settings.morph_duration_ms
         : Theme.morphDuration
 
-    // The keyboard belongs to the island only while a panel is open.
+    // The keyboard belongs to the island only while a panel is open, or
+    // while the mouse is over the pill.
     //
     // Niri hands the keyboard to a newly mapped on-demand layer surface, so
     // a surface that is focusable from the start takes the keyboard away
     // from the terminal at login and holds it until something else is
     // clicked. A notification that opens a panel must not do that either:
     // the keyboard has to stay where the reader left it.
-    focusable: IslandSettings.keyboardFocus && island.mode === "full" && !root.away
+    //
+    // The hover case is the mouse path into a panel. Niri only grants
+    // on-demand keyboard focus on a CLICK (`focus_layer_surface_if_on_demand`
+    // in `input/mod.rs`), and a click that arrives while the surface is
+    // non-focusable grants nothing — so the click that opens a panel
+    // would leave keystrokes in the terminal and force a second click
+    // inside. Hovering the pill flips the surface on-demand before the
+    // press, so the click that opens the panel also moves the keyboard to
+    // it. Hover alone never steals the keyboard: the grant still needs
+    // the press. wlroots accepts the interactivity change on a mapped
+    // surface even though the protocol says it should not.
+    focusable: IslandSettings.keyboardFocus && (island.mode === "full" || island.hovered) && !root.away
 
     // Away: dim the island and collapse any open panel.
     onAwayChanged: {
