@@ -400,11 +400,17 @@ island lands where the reader clicked, and *that* is what returns the
 keyboard.
 
 **What the shell does now.** The surface is focusable only while a
-panel is open, so it never takes the keyboard at startup and a
-notification opening a panel does not take it either. The island asks
-for the keyboard when the panel opens (`onFocusableChanged`), because
-the click that opened it arrived before the window was focusable. The
-panel gives it back when it closes.
+panel is open or the mouse is over the pill, so it never takes the
+keyboard at startup and a notification opening a panel does not take
+it either. The island asks for the keyboard when the panel opens
+(`onFocusableChanged`), because the click that opened it arrived
+before the window was focusable. The hover arm is the mouse path into a
+panel: niri grants on-demand keyboard focus only on a click, so the
+opening click must land on an already-focusable surface to move the
+keyboard — hover flips focusable before the press; hover alone never
+steals it (the press must still land). Keybind-opened panels still
+focus on click-inside, as designed. The panel gives the keyboard back
+when it closes.
 
 On the wire, with `WAYLAND_DEBUG=1`:
 
@@ -548,6 +554,21 @@ curve over 500 ms. The activity content **slides** rather than cross-fading,
 because a cross-fade reads as "a new window opened" and a slide reads as
 "the same thing saying something else" — `ui/components/SlideActivity.qml`.
 
+**Theme/notes (2026-11-09, second pass):** the theme panel was rebuilt after
+it "just look[ed] ugly": a Now-showing strip (current wallpaper thumbnail +
+name, engine status, shuffle/loop), a one-line directory row, a Material
+segmented control for the tabs, and a 3-column 16:10 gallery at height 500.
+Tiles carry a "Now" chip on the active wallpaper, hover scrim + one-tap
+apply circle. The dark/light toggle was removed at the user's request —
+dark-only, the shell stays dark whatever `settings.theme` says (it remains
+a plain field, the palette tie-in still works through it). `current_wallpaper`
+IS persisted now (settings.json + `Domain::load` restore) — before, "Now
+showing" said "Nothing set" after every restart even while `awww` was still
+showing the same image. Wallhaven tiles download AND apply in one tap
+(`wallpaper.download` gained an `apply: true` default that delegates to
+`wallpaper_set`), and the tiny API-key field folds into a "Reset key" chip
+once a key is saved.
+
 ### 5.2 The panels
 
 | # | Panel | Where its data comes from |
@@ -623,6 +644,8 @@ keybind is one argument with no quoting to get wrong.
 
 ```
 ~/.local/state/isled/     todos.json  timer.json  clipboard.json  settings.json
+                          (settings also persists current_wallpaper and the
+                          wallhaven_purity / wallhaven_api_key tier config)
 ~/.local/share/isled/     (wallpaper cache, reserved)
 ~/Documents/isle-notes/   the notes, as markdown
 ```
