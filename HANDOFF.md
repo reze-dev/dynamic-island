@@ -219,8 +219,15 @@ before removing Ryoku, or the gap is visible to every other program on the bus.
 
 ### 4.7 Compositors
 
-**Niri** — `$NIRI_SOCKET`, newline-delimited JSON. `Request::EventStream` (since
-0.1.9) streams full state then deltas; no polling. Detect via `$NIRI_SOCKET`.
+**Niri** — `$NIRI_SOCKET`, newline-delimited JSON. The `EventStream` request
+is `{"EventStream":null}` (niri replies `{"Ok":"Handled"}` then streams
+full state + deltas: `WorkspacesChanged`, `WindowsChanged`, `OutputsChanged`,
+`KeyboardLayoutsChanged`, `OverviewOpenedOrClosed`, `ConfigLoaded`,
+`CastsChanged`). Id-only deltas (`WindowFocusChanged`, `WorkspaceFocusChanged`,
+`WindowClosed`, `WorkspaceClosed`, `WorkspaceOpenedOrChanged`) carry no window
+fields, so the adapter re-queries via `niri msg -j focused-window|workspaces|outputs`
+(niri 26.04). `query()` uses the same three shell-outs; it cannot be a stub —
+`compositor.info` was `null` live until it did. Detect via `$NIRI_SOCKET`.
 
 **Hyprland** — `hyprctl -j` for queries, `event/socket2` for push. Detect via
 `$HYPRLAND_INSTANCE_SIGNATURE`.
@@ -720,14 +727,54 @@ Still open, in this order:
 
     To poke at it by hand, `just trigger media|notification|todo|clipboard|
     timer|panel` fires a single event at the running daemon.
-14. **The focus matrix** (`PLAN.md` §5.2) on both compositors. Nothing is
-    proven about focus-release-on-collapse, and it is the top-ranked risk.
-15. **Ryoku cutover.** The daemon can already claim
-    `org.freedesktop.Notifications` (opt in with `--claim-notifications`),
-    but `org.kde.StatusNotifierWatcher` is still owed.
-16. **Verify environment forwarding** — until `isled` reports
-    `compositor=niri` from a systemd unit rather than `unknown`, the unit
-    wiring is unproven.
+14. **The focus matrix** (`PLAN.md` §5.2). Partially verified live on **niri
+    26.04** (barebones session, no shell): island maps at the `overlay` layer,
+    `focusable` only while a panel is open — the wire shows
+    `set_keyboard_interactivity 0` at startup, `2` (on-demand) while a panel is
+    open, `0` again after collapse. Panel opens by `isled call view.set N`.
+    Still owed: the keyboard cells (click into a field → caret; type/filter;
+    Esc clears; Esc again collapses; keystrokes return to the terminal).
+    Those need a human at the keyboard. Hyprland cells remain undealt-with.
+15. **Cutover (serpantinum, not Ryoku anymore).** With serpantinum not running
+    `isled` owns both bus names live (`ISLED_CLAIM_NOTIFICATIONS=1` /
+    `ISLED_CLAIM_TRAY=1` in the generated user unit; notifications ingest and
+    the tray item both verified live, incl. icons and `owner: "isled"`). The
+    Home Manager module is NOT wired into Michi yet (`~/Michi` does not import
+    `isle`; its niri module has no `isled` binds) — the dev units +
+    `~/.local/bin/isled` symlink are how the barebones session ran it. Module
+    wiring + keybinds are the one remaining packaging step.
+16. **Verify environment forwarding** — done: under the systemd user unit
+    `isled` reports `compositor=niri` with live `focused_window`, `workspaces`
+    and `outputs` in `compositor.info` and `context.summary.compositor`.
+
+### 8.0b NixOS re-test (2026-11-09, barebones niri)
+
+What was built/tested on Fedora-via-Nix is now verified under real NixOS/niri
+(user systemd units, no `nixos-rebuild`): build + 237 tests + clippy/fmt,
+`just preview`/`preview-live`, live surface on `overlay`, view routing
+(`view.set`/`view.next`/`island.toggle`), compsitor query + focus activity,
+notification claim + ingest + panel, tray claim + panel + icon, MPRIS via the
+fixed `fake-mpris` (see below), awww namespaced engine (`engine_ok: true`,
+`wallpaper.set` + `awww query --json` at 1.2 scale, palette sampled to
+`palette.json`), brightness round-trip, clipboard add/list, todos/timer,
+notes, empty calendar. Two real bugs found and fixed:
+
+- **fake-mpris** registered everything under one `org.mpris.MediaPlayer2`
+  interface; Quickshell reads `.Player`, so the media panel said "Nothing is
+  playing". Split into FakePlayer (`.Player`) + FakeRoot sharing
+  `PlayerState` (zbus allows one `#[interface]` per type).
+- **Clipboard-dependent tests** (`a_client_gets_a_snapshot_then_replies`,
+  `unsolicited_events_reach_a_connected_client`) failed on any machine with a
+  non-empty clipboard: `wl-paste --watch` primes `clipboard.changed` before
+  the first `system.stats` tick, and raw `read()` coalesced the reply with the
+  event. Tests now read line-by-line and skip ambient events.
+
+Known gap: the ThemePanel preview of `.webp` wallpapers logs "Unsupported
+image format" — nixpkgs's `quickshell` does not depend on `qt6.qtimageformats`
+(and the cached build is Qt 6.11.2 while current imageformats is 6.12, so the
+plugin can't load cross-version). The `awww` engine renders webp fine; only
+the grid tile is affected. Resolves when quickshell is rebuilt onto a
+matching Qt (or the package gains the dep).
 
 ### 8.1 After the Material pass — what is next
 
