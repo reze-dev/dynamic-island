@@ -240,11 +240,14 @@ platform/environment ones (not missing features):
 | Phase 6: lock/join/unplug behave sensibly on both | Done (Sway) | Compositor adapter (niri/hyprland/Sway), logind/UPower/PipeWire/NM/clipboard-burst, reducer + scorer; live-checked on Sway (`compositor.info`, `context.signal`). Dual-compositor cells are unit-tested, not live here. |
 | Phase 7: idle/low-power, animation, a11y, fallbacks | Done | Reduced-motion/high-contrast/focus ring/StaleBanner/a11y names/stagger+easing tokens; missing-service fallbacks in all 10 panels. |
 
-Known gaps (declared, not hidden): matugen tie-in; calendar month grid
-(agenda only); brightness/dark-mode toggles; niri/hyprland live
-focus-matrix/text-adapter cells (unit-tested only); Ryoku-successor
-milestone split per PLAN §3.5 (on this machine Waybar remains the tray
-host — `tray.list` reports `owner: "other"` and the panel explains it).
+Known gaps (declared, not hidden): niri/hyprland live
+focus-matrix cells (unit-tested only — Sway is the only live host
+here); Ryoku-successor milestone split per PLAN §3.5 (on this machine
+Waybar remains the tray host — `tray.list` reports `owner: "other"`
+and the panel explains it); DDC/CI monitor brightness (backlight-only
+by design); matugen binary as optional accelerator (sampled path is
+primary); QuickShell runtime is Nix-store 0.3.x (Fedora 0.2.1 lacks
+the `_BackgroundEffect` module + `Region.radius`).
 
 Tray/log activity for the last full run lives in the sections above
 (photos: tray file entries, notification entries, Isolated
