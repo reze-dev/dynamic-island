@@ -581,6 +581,17 @@ Wallhaven tier work (dispatch holding `domain` across awaited the search
 while the search prune re-locked it) wedged the daemon on the first real
 search; the fix is clone-then-drop (see §4.8).
 
+**Panics audit (2026-11-09, fourth pass):** the user called out the Notes
+and Clipboard panes specifically ("captured create [buttons] way too fat",
+the saved-file link + "+" hanging crooked). Notes footer is now a single
+row (state · directory · external/trash/add all at one height), notes list
+cards gained the same trash affordance as todos, and the clipboard actions
+row is quiet 11-px text controls like everything else. Remaining raw text
+edges: the context panel's odometer vitals (CPU/MEM/UPTIME/UNREAD) were
+kept — it is that panel's job — everything else read consistent in the
+seeded renders (todos, notifications, network, media, calendar, tray,
+theme).
+
 ### 5.2 The panels
 
 | # | Panel | Where its data comes from |

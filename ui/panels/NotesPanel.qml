@@ -99,6 +99,15 @@ Item {
         });
     }
 
+    function removeNote(id) {
+        if (!panel.bridge || !id)
+            return;
+        // Match `select()`: never throw unsaved edits away with the note.
+        if (panel.dirty && panel.selected && panel.selected.id === id)
+            panel.save();
+        panel.bridge.callAndSay("notes.remove", { "id": id }, "Note deleted", "Could not delete the note");
+    }
+
     SectionHeader {
         id: header
         anchors.top: parent.top
@@ -149,7 +158,7 @@ Item {
                 anchors.left: parent.left
                 anchors.leftMargin: Theme.spacingTight + 2
                 anchors.right: parent.right
-                anchors.rightMargin: Theme.spacingTight
+                anchors.rightMargin: 36
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 1
 
@@ -181,8 +190,22 @@ Item {
                 }
             }
 
+            IconButton {
+                anchors.right: parent.right
+                anchors.rightMargin: 6
+                anchors.verticalCenter: parent.verticalCenter
+                icon: "trash"
+                size: 22
+                tooltip: "Delete note"
+                onClicked: panel.removeNote(entry.modelData.id)
+            }
+
             MouseArea {
-                anchors.fill: parent
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.rightMargin: 36
                 cursorShape: Qt.PointingHandCursor
                 onClicked: panel.select(entry.modelData)
             }
@@ -279,14 +302,16 @@ Item {
         }
     }
 
-    // The footer: the save state, the directory, and the two buttons. It is
-    // a row of its own so that nothing can end up underneath the buttons.
+    // The footer: save state, directory, and the action group — one row
+    // at one height, so the buttons read as buttons and the text as text.
+    // (The old arrangement anchored two 28-px buttons to the panel corners
+    // next to a 16-px-tall text line, which is how they went crooked.)
     Row {
         id: footer
         anchors.left: parent.left
         anchors.leftMargin: parent.width * 0.4
-        anchors.right: newNoteButton.left
-        anchors.rightMargin: Theme.spacingTight
+        anchors.right: parent.right
+        anchors.rightMargin: Theme.spacing
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Theme.spacingTight
         spacing: Theme.spacingTight
@@ -295,6 +320,7 @@ Item {
             id: saveState
             anchors.verticalCenter: parent.verticalCenter
             text: panel.dirty ? "UNSAVED" : (panel.selected ? "SAVED" : "")
+            wrapMode: Text.NoWrap
             color: panel.dirty ? Theme.toneWarn : Theme.onSurfaceVariant
             font.family: Theme.fontFamily
             font.pixelSize: Theme.type.labelSmall.size
@@ -304,9 +330,11 @@ Item {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            // Whatever the buttons and the save state have not claimed.
-            width: Math.max(0, footer.width - saveState.width - footer.spacing)
+            // Whatever the save state and the three buttons leave it.
+            width: Math.max(0, footer.width - saveState.implicitWidth
+                - 3 * 28 - 4 * footer.spacing)
             text: panel.directory
+            wrapMode: Text.NoWrap
             color: Theme.onSurfaceVariant
             font.family: Theme.fontFamily
             font.pixelSize: Theme.type.labelSmall.size
@@ -314,38 +342,40 @@ Item {
             font.letterSpacing: Theme.type.labelSmall.tracking
             elide: Text.ElideLeft
         }
-    }
 
-    IconButton {
-        id: obsidianButton
-        anchors.right: parent.right
-        anchors.rightMargin: Theme.spacing + 32
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: Theme.spacingTight
-        icon: "external"
-        size: 28
-        visible: panel.selected !== null
-        tooltip: "Open in Obsidian"
-        onClicked: {
-            if (!panel.bridge || !panel.selected)
-                return;
-            panel.bridge.call("notes.obsidian", { "id": panel.selected.id }, function (ok, payload) {
-                if (ok && payload && payload.uri)
-                    Qt.openUrlExternally(payload.uri);
-            });
+        IconButton {
+            anchors.verticalCenter: parent.verticalCenter
+            icon: "external"
+            size: 28
+            visible: panel.selected !== null
+            tooltip: "Open in Obsidian"
+            onClicked: {
+                if (!panel.bridge || !panel.selected)
+                    return;
+                panel.bridge.call("notes.obsidian", { "id": panel.selected.id }, function (ok, payload) {
+                    if (ok && payload && payload.uri)
+                        Qt.openUrlExternally(payload.uri);
+                });
+            }
         }
-    }
 
-    IconButton {
-        id: newNoteButton
-        anchors.right: parent.right
-        anchors.rightMargin: Theme.spacing
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: Theme.spacingTight
-        icon: "plus"
-        size: 28
-        tooltip: "New note"
-        enabled: panel.bridge
-        onClicked: panel.newNote()
+        IconButton {
+            anchors.verticalCenter: parent.verticalCenter
+            icon: "trash"
+            size: 28
+            enabled: panel.bridge && panel.selected !== null
+            visible: panel.selected !== null
+            tooltip: "Delete note"
+            onClicked: panel.removeNote(panel.selectedId)
+        }
+
+        IconButton {
+            anchors.verticalCenter: parent.verticalCenter
+            icon: "plus"
+            size: 28
+            tooltip: "New note"
+            enabled: panel.bridge
+            onClicked: panel.newNote()
+        }
     }
 }

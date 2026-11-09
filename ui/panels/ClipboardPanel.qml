@@ -64,35 +64,78 @@ Item {
         onEscapePressed: searchBox.text = ""
     }
 
-    // The actions.
+    // The actions, as quiet text — the same register as the wallpaper
+    // panel's "change". The old pair were a stub outlined button and a
+    // text button stretched against each other, which read as oversized
+    // slabs next to a much smaller list.
     Row {
         id: actions
         anchors.top: searchBox.bottom
-        anchors.topMargin: Theme.spacingTight
+        anchors.topMargin: 6
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: Theme.spacing
         anchors.rightMargin: Theme.spacing
+        height: 24
         spacing: Theme.spacingTight
 
-        Button {
-            variant: "outlined"
-            text: "Capture"
-            icon: "copy"
-            enabled: panel.bridge
-            onClicked: panel.bridge
-                ? panel.bridge.callAndSay("clipboard.capture", {}, "Captured the clipboard")
-                : null
+        Row {
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
+
+            Icon {
+                anchors.verticalCenter: parent.verticalCenter
+                name: "copy"
+                width: 13
+                height: 13
+                color: Theme.primary
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Capture"
+                color: Theme.primary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.type.labelSmall.size
+                font.weight: Theme.type.labelSmall.weight
+                font.letterSpacing: Theme.type.labelSmall.tracking
+
+                MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: panel.bridge
+                        ? panel.bridge.callAndSay("clipboard.capture", {}, "Captured the clipboard")
+                        : null
+                }
+            }
         }
 
-        Button {
-            variant: "text"
-            text: "Clear"
+        Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            width: 1
+            height: 14
+            color: Theme.outlineVariant
+        }
+
+        Text {
             visible: panel.entries.length > 0
-            enabled: panel.bridge
-            onClicked: panel.bridge
-                ? panel.bridge.callAndSay("clipboard.clear", {}, "Clipboard cleared")
-                : null
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Clear history"
+            color: Theme.onSurfaceVariant
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.type.labelSmall.size
+            font.weight: Theme.type.labelSmall.weight
+            font.letterSpacing: Theme.type.labelSmall.tracking
+
+            MouseArea {
+                anchors.fill: parent
+                anchors.margins: -6
+                cursorShape: Qt.PointingHandCursor
+                onClicked: panel.bridge
+                    ? panel.bridge.callAndSay("clipboard.clear", {}, "Clipboard cleared")
+                    : null
+            }
         }
     }
 
