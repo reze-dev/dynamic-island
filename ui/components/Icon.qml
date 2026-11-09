@@ -47,11 +47,16 @@ Item {
         clip: true
     }
 
+    // The outline path is drawn in the 24-unit Material grid, y-flipped
+    // from the font's frame. The Shape sits centred, and the scale grows
+    // about the centre, so the glyph lands in the middle of its plate
+    // instead of the top-left corner.
     Shape {
+        anchors.centerIn: parent
         width: 24
         height: 24
         scale: Math.max(0.01, Math.min(root.width, root.height) / 24)
-        transformOrigin: Item.TopLeft
+        transformOrigin: Item.Center
         visible: !Icons.available
 
         ShapePath {

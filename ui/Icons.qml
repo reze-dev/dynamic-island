@@ -19,23 +19,25 @@ import QtQuick
 // path's own resolution rather than at the size being drawn, so it
 // is rougher than the font is.
 QtObject {
-    /// The family the icons come from. The font ships Rounded,
-    /// Outlined and Sharp.
-    readonly property string family: "Material Symbols Rounded"
+    /// The family the icons come from. Both Material Symbols and Material
+    /// Icons families render through the same ligature table; Fedora ships
+    /// the Icons family (`material-icons-fonts`), so the default is its
+    /// Round style.
+    readonly property string family: "Material Icons Round"
 
     /// Whether the font is installed at all.
     readonly property bool available: Qt.fontFamilies().indexOf(family) >= 0
 
     /// The name the font knows each of the shell's icons by.
     readonly property var ligatures: ({
-        "activity": "monitor_heart",
+        "activity": "favorite",
         "alert": "warning",
         "apps": "apps",
-        "arrow-up-right": "arrow_outward",
+        "arrow-up-right": "north_east",
         "battery": "battery_full",
         "bell": "notifications",
         "bluetooth": "bluetooth",
-        "calendar": "calendar_month",
+        "calendar": "calendar_view_day",
         "check": "check",
         "check-circle": "check_circle",
         "check-square": "check_box",
@@ -47,7 +49,7 @@ QtObject {
         "clipboard": "content_paste",
         "clock": "schedule",
         "close": "close",
-        "contrast": "contrast",
+        "contrast": "tonality",
         "copy": "content_copy",
         "cpu": "memory",
         "dashboard": "dashboard",
@@ -60,7 +62,7 @@ QtObject {
         "external": "open_in_new",
         "eye": "visibility",
         "folder": "folder",
-        "grid": "grid_view",
+        "grid": "grid_on",
         "home": "home",
         "image": "image",
         "info": "info",
@@ -68,11 +70,11 @@ QtObject {
         "label": "label",
         "list": "list",
         "lock": "lock",
-        "moon": "dark_mode",
+        "moon": "brightness_2",
         "music": "music_note",
         "next": "skip_next",
         "nfc": "nfc",
-        "note": "edit_note",
+        "note": "note_add",
         "palette": "palette",
         "paperclip": "attach_file",
         "pause": "pause",
@@ -89,8 +91,8 @@ QtObject {
         "settings": "settings",
         "snooze": "snooze",
         "sort": "sort",
-        "spark": "auto_awesome",
-        "sun": "light_mode",
+        "spark": "star",
+        "sun": "brightness_7",
         "timer": "timer",
         "today": "today",
         "toggle-off": "toggle_off",
