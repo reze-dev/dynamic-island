@@ -569,6 +569,18 @@ showing the same image. Wallhaven tiles download AND apply in one tap
 `wallpaper_set`), and the tiny API-key field folds into a "Reset key" chip
 once a key is saved.
 
+**Pill appearances (2026-11-09, third pass):** the triggered morph the user
+called ugly had two causes: an event while a panel was open yanking the
+reader into the triggered pill, and the pill's two-line content overlapping
+its band. Events while full now latch the tone, keep the panel, and speak
+through the snackbar; the pill's headline tightened (30px badge,
+bodyMedium, no line gap) so it fits without clipping. The peek's CPU/memory
+mini-bars are gone — the right edge shows the timer ring with remaining
+time while one runs, the clock otherwise. A Rust self-deadlock from the
+Wallhaven tier work (dispatch holding `domain` across awaited the search
+while the search prune re-locked it) wedged the daemon on the first real
+search; the fix is clone-then-drop (see §4.8).
+
 ### 5.2 The panels
 
 | # | Panel | Where its data comes from |
