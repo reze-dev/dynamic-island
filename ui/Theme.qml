@@ -293,8 +293,10 @@ QtObject {
     property bool reducedMotion: false
     /// Boosted text contrast for accessibility.
     property bool highContrast: false
-    /// The colour scheme: "dark" (default) or "light", from
-    /// `settings.theme` via the theme toggle in the wallpaper panel.
+    /// The colour scheme: "dark" (default) or "light", from `settings.theme`.
+    /// The wallpaper picker used to expose this switch; it is dark-only now
+    /// by the sole user's decision, but direct calls to
+    /// `settings.set '{"key":"theme",...}'` still work.
     property string scheme: "dark"
     readonly property bool light: scheme === "light"
     /// Material palette derived from the current wallpaper
